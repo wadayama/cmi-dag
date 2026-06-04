@@ -11,10 +11,10 @@ Numerical primitives (`logdet_hpd`, `pga_ascent`, `get_K`, `hermitianize`,
 and are imported from there rather than duplicated.
 """
 
-from gaussian_dag_cmi.information import conditional_mutual_information_from_k
-from gaussian_dag_cmi.krecursion import compute_k_blocks_multiroot
-from gaussian_dag_cmi.optimize import pga_descent
-from gaussian_dag_cmi.rate_region import Summand, evaluate_rate_functions
+from cmi_dag.information import conditional_mutual_information_from_k
+from cmi_dag.krecursion import compute_k_blocks_multiroot
+from cmi_dag.optimize import pga_descent
+from cmi_dag.rate_region import Summand, evaluate_rate_functions
 
 __all__ = [
     "Summand",

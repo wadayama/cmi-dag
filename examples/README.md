@@ -1,4 +1,4 @@
-# `gaussian-dag-cmi/examples/`
+# `cmi-dag/examples/`
 
 Three self-contained scripts that each (a) reproduce one figure of the
 companion paper *"Differentiable Conditional Mutual Information for Linear
@@ -68,4 +68,4 @@ These examples are the sister set to
 of the parent library. There the topologies are single-root (one
 transmitter → MIMO sink); here the topologies are multi-root (multiple
 sources) and use the conditional mutual information layer added by
-`gaussian_dag_cmi`.
+`cmi_dag`.

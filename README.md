@@ -1,4 +1,4 @@
-# gaussian-dag-cmi
+# cmi-dag
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue.svg)](https://www.python.org/)
@@ -49,8 +49,8 @@ K-recursion or Cholesky code.
 ## Installation
 
 ```bash
-git clone https://github.com/wadayama/gaussian-dag-cmi.git
-cd gaussian-dag-cmi
+git clone https://github.com/wadayama/cmi-dag.git
+cd cmi-dag
 uv sync
 ```
 
@@ -78,8 +78,8 @@ uv sync --extra examples
 ## Repository layout
 
 ```
-gaussian-dag-cmi/
-├── gaussian_dag_cmi/     core library (4 modules + __init__)
+cmi-dag/
+├── cmi_dag/     core library (4 modules + __init__)
 ├── tests/                pytest suite (37 tests, 6 files)
 ├── examples/             3 runnable scripts (paper-figure reproduction)
 ├── docs/                 5-part Markdown tutorial walkthrough
@@ -114,7 +114,7 @@ each one a single call to the library's CMI primitive:
 
 ```python
 import torch
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,
 )
@@ -155,7 +155,7 @@ under a shared total-power budget:
 import torch
 from gaussian_dag.optimize import pga_ascent
 from gaussian_dag.projections import project_total_power
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     evaluate_rate_functions,
 )
@@ -203,7 +203,7 @@ The pentagon expands monotonically over the iterations. See
 All symbols below are re-exported from the top-level package:
 
 ```python
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,
     Summand, evaluate_rate_functions,
@@ -388,4 +388,4 @@ This work was supported by JST, CRONOS, Japan Grant Number JPMJCS25N5.
 
 ## License
 
-`gaussian-dag-cmi` is released under the [MIT License](LICENSE).
+`cmi-dag` is released under the [MIT License](LICENSE).

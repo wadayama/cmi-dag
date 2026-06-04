@@ -1,13 +1,13 @@
-"""Unit tests for gaussian_dag_cmi.rate_region.evaluate_rate_functions."""
+"""Unit tests for cmi_dag.rate_region.evaluate_rate_functions."""
 
 from __future__ import annotations
 
 import pytest
 import torch
 
-from gaussian_dag_cmi.information import conditional_mutual_information_from_k
-from gaussian_dag_cmi.krecursion import compute_k_blocks_multiroot
-from gaussian_dag_cmi.rate_region import evaluate_rate_functions
+from cmi_dag.information import conditional_mutual_information_from_k
+from cmi_dag.krecursion import compute_k_blocks_multiroot
+from cmi_dag.rate_region import evaluate_rate_functions
 
 DTYPE = torch.complex128
 

@@ -27,7 +27,7 @@ import math
 
 import torch
 
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,
 )

@@ -1,6 +1,6 @@
 # Tutorial 1 — Installation and your first conditional MI
 
-This first tutorial walks through installing `gaussian-dag-cmi` and
+This first tutorial walks through installing `cmi-dag` and
 computing the three pentagon conditional mutual informations of a 2-user
 vector Gaussian multiple-access channel (MAC). The 2-user MAC is the
 smallest non-trivial multi-terminal channel: it has two independent
@@ -9,7 +9,7 @@ classical pentagon.
 
 By the end of this tutorial you will:
 
-- Have a working `gaussian-dag-cmi` environment.
+- Have a working `cmi-dag` environment.
 - Understand the 2-user MAC as a 3-node multi-root linear Gaussian DAG.
 - Have evaluated the three pentagon conditional MIs
   `I_1 = I(X_1; Y | X_2)`, `I_2 = I(X_2; Y | X_1)`, and
@@ -22,15 +22,15 @@ By the end of this tutorial you will:
 
 ## 1. Install the library
 
-`gaussian-dag-cmi` is a small Python package built on PyTorch. It depends
+`cmi-dag` is a small Python package built on PyTorch. It depends
 on the parent library [`gaussian-dag`](https://github.com/wadayama/gaussian-dag);
 both are installed automatically by `uv sync`. Use
 [`uv`](https://docs.astral.sh/uv/) to manage the virtual environment.
 
 ```bash
 # Clone the repository.
-git clone https://github.com/wadayama/gaussian-dag-cmi.git
-cd gaussian-dag-cmi
+git clone https://github.com/wadayama/cmi-dag.git
+cd cmi-dag
 
 # Install dependencies into a fresh .venv (Python >= 3.12 required).
 uv sync
@@ -84,7 +84,7 @@ of the support covariance — exactly the formula evaluated by
 
 ```python
 import torch
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,
 )
@@ -163,7 +163,7 @@ Run a short check:
 ```python
 import math
 import torch
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,
 )

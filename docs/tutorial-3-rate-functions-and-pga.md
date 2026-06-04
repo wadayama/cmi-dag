@@ -48,7 +48,7 @@ conditional mutual informations:
    f_T(η, H) = sum_{n=1}^{N_T} α_{T,n} · I(V_{A_n}; V_{B_n} | V_{C_n}).
 ```
 
-The `gaussian-dag-cmi` library represents one such summand as a
+The `cmi-dag` library represents one such summand as a
 `Summand` tuple `(α, A, B, C)` and a rate function as a list of summands.
 `evaluate_rate_functions` evaluates a whole family of them from a single
 K-recursion forward pass.
@@ -63,7 +63,7 @@ inequalities is the triple `(A, B, C)`:
 
 ```python
 import torch
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     evaluate_rate_functions,
 )

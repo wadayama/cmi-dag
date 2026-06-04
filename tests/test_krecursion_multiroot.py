@@ -1,4 +1,4 @@
-"""Unit tests for gaussian_dag_cmi.krecursion.compute_k_blocks_multiroot."""
+"""Unit tests for cmi_dag.krecursion.compute_k_blocks_multiroot."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from gaussian_dag.krecursion import compute_k_blocks
-from gaussian_dag_cmi.krecursion import compute_k_blocks_multiroot
+from cmi_dag.krecursion import compute_k_blocks_multiroot
 
 DTYPE = torch.complex128
 

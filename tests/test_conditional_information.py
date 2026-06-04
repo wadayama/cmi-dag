@@ -1,4 +1,4 @@
-"""Unit tests for gaussian_dag_cmi.information.conditional_mutual_information_from_k."""
+"""Unit tests for cmi_dag.information.conditional_mutual_information_from_k."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import torch
 
 from gaussian_dag.information import mutual_information_from_k
 from gaussian_dag.krecursion import compute_k_blocks
-from gaussian_dag_cmi.information import conditional_mutual_information_from_k
-from gaussian_dag_cmi.krecursion import compute_k_blocks_multiroot
+from cmi_dag.information import conditional_mutual_information_from_k
+from cmi_dag.krecursion import compute_k_blocks_multiroot
 
 DTYPE = torch.complex128
 

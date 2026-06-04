@@ -1,4 +1,4 @@
-"""Unit tests for gaussian_dag_cmi.optimize.pga_descent."""
+"""Unit tests for cmi_dag.optimize.pga_descent."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from gaussian_dag.optimize import pga_ascent
-from gaussian_dag_cmi.optimize import pga_descent
+from cmi_dag.optimize import pga_descent
 
 DTYPE = torch.complex128
 

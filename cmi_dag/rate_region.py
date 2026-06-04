@@ -28,7 +28,7 @@ from collections.abc import Sequence
 
 import torch
 
-from gaussian_dag_cmi.information import conditional_mutual_information_from_k
+from cmi_dag.information import conditional_mutual_information_from_k
 
 # One summand alpha_{T,n} I(V_{A_n}; V_{B_n} | V_{C_n}) of the rate function f_T.
 Summand = tuple[float, Sequence[int], Sequence[int], Sequence[int]]

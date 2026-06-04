@@ -3,6 +3,34 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
+name = "cmi-dag"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "gaussian-dag" },
+    { name = "numpy" },
+    { name = "torch" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+]
+examples = [
+    { name = "matplotlib" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "gaussian-dag", editable = "../gaussian-dag-public" },
+    { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.10" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "torch", specifier = ">=2.12.0" },
+]
+provides-extras = ["examples", "dev"]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -226,34 +254,6 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pyyaml", marker = "extra == 'examples'", specifier = ">=6.0" },
-    { name = "torch", specifier = ">=2.12.0" },
-]
-provides-extras = ["examples", "dev"]
-
-[[package]]
-name = "gaussian-dag-cmi"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "gaussian-dag" },
-    { name = "numpy" },
-    { name = "torch" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-]
-examples = [
-    { name = "matplotlib" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "gaussian-dag", editable = "../gaussian-dag-public" },
-    { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.10" },
-    { name = "numpy", specifier = ">=2.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "torch", specifier = ">=2.12.0" },
 ]
 provides-extras = ["examples", "dev"]

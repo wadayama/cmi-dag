@@ -29,7 +29,7 @@ input. Multi-terminal channels naturally have several *independent*
 source nodes — two transmitters of a MAC, K transmitters of a K-user
 interference channel, the private and common parts of a Han–Kobayashi
 split, two sources of a multi-source relay network, and so on.
-`gaussian-dag-cmi` extends the K-recursion to handle any number of such
+`cmi-dag` extends the K-recursion to handle any number of such
 roots:
 
 ```
@@ -112,7 +112,7 @@ K-blocks are PyTorch tensors with the natural shapes:
 
 ```python
 import torch
-from gaussian_dag_cmi import compute_k_blocks_multiroot
+from cmi_dag import compute_k_blocks_multiroot
 from gaussian_dag import get_K                       # the parent's accessor
 
 torch.manual_seed(0)

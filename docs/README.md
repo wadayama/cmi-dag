@@ -1,4 +1,4 @@
-# gaussian-dag-cmi tutorials
+# cmi-dag tutorials
 
 A five-part walkthrough of the library, from a first conditional MI
 evaluation on a 2-user MAC to the reproduction of the paper's random

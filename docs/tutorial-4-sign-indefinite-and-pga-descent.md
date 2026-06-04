@@ -75,7 +75,7 @@ The rate-function machinery of Tutorial 3 covers this case directly:
 
 ```python
 import torch
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     evaluate_rate_functions,
 )
@@ -101,7 +101,7 @@ function carries two `Summand` tuples whose coefficients are `+1` and
 `−1`. `evaluate_rate_functions` returns the difference verbatim.
 
 The framework imposes no sign constraint on `α_{T,n}` (see
-[`gaussian_dag_cmi/rate_region.py`](../gaussian_dag_cmi/rate_region.py)):
+[`cmi_dag/rate_region.py`](../cmi_dag/rate_region.py)):
 the projected-gradient method needs only differentiability of the rate
 function in the precoder, not concavity or monotonicity.
 
@@ -167,7 +167,7 @@ returned history is in the **true sign** of your cost and is
 monotonically non-increasing for a successful descent.
 
 ```python
-from gaussian_dag_cmi import pga_descent
+from cmi_dag import pga_descent
 
 # Suppose you want to MINIMISE the eavesdropper information I(X; Z) on its own,
 # with no positive counterpart. Express it as a (single-summand) rate function
@@ -198,7 +198,7 @@ direction. The two functions live in different libraries:
 
 ```
    gaussian_dag.optimize.pga_ascent           (parent: ascend)
-   gaussian_dag_cmi.optimize.pga_descent      (child:  descend)
+   cmi_dag.optimize.pga_descent      (child:  descend)
 ```
 
 Pick whichever matches the *natural* sign of your objective so the

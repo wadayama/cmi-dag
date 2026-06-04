@@ -161,7 +161,7 @@ For each edge `(j, i)`:
   relay's *shared* processing.
 
 ```python
-from gaussian_dag_cmi import (
+from cmi_dag import (
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,
 )
@@ -307,6 +307,6 @@ and inspect `examples/figures/random_mac.pdf`.
   complement pipeline agree exactly with the classical log-det
   capacity formulas.
 
-Congratulations — you have walked through the full `gaussian-dag-cmi`
+Congratulations — you have walked through the full `cmi-dag`
 pipeline, from a 2-user MAC sanity check to a 12-node random multi-hop
 network optimised under a shared budget.
