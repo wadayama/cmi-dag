@@ -29,9 +29,8 @@ in a single sweep; PyTorch's complex autograd then delivers the exact
 Wirtinger gradient with respect to every controllable factor in the DAG
 in a single backward sweep. No per-topology gradient derivation is
 required. Every component is end-to-end differentiable, device-agnostic
-(CPU / CUDA / MPS where supported by PyTorch), and built on top of the
-parent library's numerical primitives — there is no duplicated
-K-recursion or Cholesky code.
+(CPU / CUDA), and built on top of the parent library's numerical
+primitives — there is no duplicated K-recursion or Cholesky code.
 
 > **Funding.** This work was supported by JST, CRONOS, Japan
 > Grant Number **JPMJCS25N5**.
@@ -317,9 +316,9 @@ device PyTorch places the inputs on.
 
 One device-parameterised test in `tests/test_device_agnostic.py` is
 skipped on CPU-only machines but exercises the full pipeline on CUDA
-when available. As of PyTorch 2.12 the `complex128` linear-algebra
-primitives (`cholesky`, `solve`) are implemented on CPU and CUDA but
-not on MPS; the standard workflow uses `complex128` on CPU or CUDA.
+when available. The standard workflow uses `complex128` on either CPU
+or CUDA; both are exercised by the test suite at full numerical
+precision.
 
 The three runnable scripts in `examples/` auto-detect CUDA with
 `DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")`
