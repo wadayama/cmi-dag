@@ -113,7 +113,7 @@ K-blocks are PyTorch tensors with the natural shapes:
 ```python
 import torch
 from cmi_dag import compute_k_blocks_multiroot
-from gaussian_dag import get_K                       # the parent's accessor
+from cmi_dag import get_K                       # Hermitian-flip accessor
 
 torch.manual_seed(0)
 d = 2

@@ -1,6 +1,6 @@
 [project]
 name = "cmi-dag"
-version = "0.1.0"
+version = "0.2.0"
 description = "Conditional mutual information and gradient-based optimization for linear Gaussian-DAG multi-terminal networks, extending gaussian-dag with multi-root K-recursion."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -30,7 +30,6 @@ classifiers = [
 dependencies = [
     "torch>=2.12.0",
     "numpy>=2.0",
-    "gaussian-dag>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -55,6 +54,3 @@ packages = ["cmi_dag"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-
-[tool.uv.sources]
-gaussian-dag = { path = "../gaussian-dag-public", editable = true }

@@ -117,8 +117,8 @@ PGA needs a callable that, given the current state of the parameters,
 rebuilds the autograd graph and returns the scalar objective:
 
 ```python
-from gaussian_dag.optimize import pga_ascent
-from gaussian_dag.projections import project_total_power
+from cmi_dag.optimize import pga_ascent
+from cmi_dag.projections import project_total_power
 
 torch.manual_seed(0)
 d = 4

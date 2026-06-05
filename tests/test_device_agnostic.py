@@ -15,7 +15,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from gaussian_dag.projections import project_frobenius_ball
+from cmi_dag.projections import project_frobenius_ball
 from cmi_dag import (
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,

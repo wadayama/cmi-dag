@@ -16,9 +16,11 @@ Each tutorial is self-contained and includes runnable code snippets. The
 scripts under `../examples/` accompany Tutorials 3–5 as the polished
 end-to-end versions; reading them is optional.
 
-These tutorials assume familiarity with the parent library
-[`gaussian-dag`](https://github.com/wadayama/gaussian-dag) — in particular
-the single-root `compute_k_blocks` and `pga_ascent` covered in its own
-[docs](https://github.com/wadayama/gaussian-dag/tree/main/docs). If you
-have not yet, working through that tutorial series first will make this
-one substantially easier.
+These tutorials are self-contained — `cmi-dag` has no `gaussian-dag`
+runtime dependency. That said, the single-root background (the
+`compute_k_blocks` recursion and `pga_ascent`) is introduced more gently
+in the parent library
+[`gaussian-dag`](https://github.com/wadayama/gaussian-dag) and its
+[docs](https://github.com/wadayama/gaussian-dag/tree/main/docs); working
+through that tutorial series first will make this one easier, but is not
+required.

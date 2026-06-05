@@ -4,10 +4,9 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "cmi-dag"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
-    { name = "gaussian-dag" },
     { name = "numpy" },
     { name = "torch" },
 ]
@@ -22,7 +21,6 @@ examples = [
 
 [package.metadata]
 requires-dist = [
-    { name = "gaussian-dag", editable = "../gaussian-dag-public" },
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.10" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
@@ -238,25 +236,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/d5/8d/1c51c094345df128c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d5/0c/043d5e551459da400957a1395e0febbf771446ff34291afcbe3d8be2a279/fsspec-2026.4.0-py3-none-any.whl", hash = "sha256:11ef7bb35dab8a394fde6e608221d5cf3e8499401c249bebaeaad760a1a8dec2", size = 203402, upload-time = "2026-04-29T20:42:36.842Z" },
 ]
-
-[[package]]
-name = "gaussian-dag"
-version = "0.1.0"
-source = { editable = "../gaussian-dag-public" }
-dependencies = [
-    { name = "numpy" },
-    { name = "torch" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.10" },
-    { name = "numpy", specifier = ">=2.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pyyaml", marker = "extra == 'examples'", specifier = ">=6.0" },
-    { name = "torch", specifier = ">=2.12.0" },
-]
-provides-extras = ["examples", "dev"]
 
 [[package]]
 name = "iniconfig"

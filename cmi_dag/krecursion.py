@@ -13,7 +13,11 @@ two transmitter roots).
 
 Canonical storage: K stores only K_{jk} for j >= k. Access to K_{ab} with
 a < b is performed via the Hermitian flip rule K_{ab} = K_{ba}^H through
-the parent's `get_K`.
+`get_K`.
+
+`hermitianize` and `get_K` are the same numerical primitives as in
+`gaussian_dag.krecursion`; they are vendored here so this library is fully
+self-contained (no `gaussian-dag` runtime dependency).
 """
 
 from __future__ import annotations
@@ -22,7 +26,28 @@ from collections.abc import Sequence
 
 import torch
 
-from gaussian_dag.krecursion import get_K, hermitianize
+
+def hermitianize(A: torch.Tensor) -> torch.Tensor:
+    """Symmetrize a square matrix by (A + A^H) / 2.
+
+    This enforces exact Hermitian structure on tensors that should be Hermitian
+    in theory but may drift due to floating-point round-off.
+    """
+    return 0.5 * (A + A.mH)
+
+
+def get_K(
+    K: dict[tuple[int, int], torch.Tensor],
+    a: int,
+    b: int,
+) -> torch.Tensor:
+    """Return K_{ab}, applying Hermitian flip when a < b.
+
+    K is assumed to store only canonical keys (j, k) with j >= k.
+    """
+    if a >= b:
+        return K[(a, b)]
+    return K[(b, a)].mH
 
 
 def compute_k_blocks_multiroot(

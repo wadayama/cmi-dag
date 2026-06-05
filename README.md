@@ -40,10 +40,13 @@ primitives — there is no duplicated K-recursion or Cholesky code.
 ## Requirements
 
 - Python ≥ 3.12
-- PyTorch ≥ 2.12 (installed as a transitive dependency)
-- [`gaussian-dag`](https://github.com/wadayama/gaussian-dag) ≥ 0.1.0
-  (installed as a transitive dependency)
+- PyTorch ≥ 2.12 (the only runtime dependency)
 - [`uv`](https://docs.astral.sh/uv/) for environment management (recommended)
+
+`cmi-dag` is fully self-contained: it has **no `gaussian-dag` runtime
+dependency**. The generic numerical primitives it shares with the parent
+(`get_K`, `hermitianize`, `logdet_hpd`, `pga_ascent`, the projectors) are
+vendored here, byte-identical to `gaussian-dag`'s.
 
 ## Installation
 
@@ -88,8 +91,10 @@ cmi-dag/
 ```
 
 The subdirectories `examples/` and `docs/` carry their own short
-READMEs. For the optimisation framework and projector primitives,
-consult the parent library
+READMEs. The optimisation framework (`pga_ascent` / `pga_descent`) and
+projector primitives live in this package (`cmi_dag.optimize`,
+`cmi_dag.projections`); for the single-root background and its derivation
+see the parent library
 [`gaussian-dag`](https://github.com/wadayama/gaussian-dag).
 
 ---
@@ -152,11 +157,11 @@ under a shared total-power budget:
 
 ```python
 import torch
-from gaussian_dag.optimize import pga_ascent
-from gaussian_dag.projections import project_total_power
 from cmi_dag import (
     compute_k_blocks_multiroot,
     evaluate_rate_functions,
+    pga_ascent,
+    project_total_power,
 )
 
 torch.manual_seed(0)
@@ -216,13 +221,14 @@ from cmi_dag import (
 | `conditional_mutual_information_from_k(K, A, B, C=(), *, jitter=0.0)` | `information` | `I(V_A; V_B \| V_C) = log det Σ_{A\|C} − log det Σ_{A\|BC}` for arbitrary disjoint subsets `A, B, C` of the node set. Schur complement via `torch.linalg.solve`; log-det via the parent's Cholesky-based `logdet_hpd`. Differentiable. |
 | `Summand` | `rate_region` | Type alias `tuple[float, Sequence[int], Sequence[int], Sequence[int]]` representing one term `α · I(V_A; V_B \| V_C)` of a rate function. |
 | `evaluate_rate_functions(K, inequalities, *, jitter=0.0)` | `rate_region` | Evaluate a family of rate functions `f_T = Σ_n α_{T,n} · I(V_{A_n}; V_{B_n} \| V_{C_n})` from one K-recursion forward pass. Coefficient signs are unrestricted (negative `α` is fine; needed for HK and secrecy objectives). |
-| `pga_descent(closure, params, *, step_size, num_iters, projector=None)` | `optimize` | Constant-step projected gradient **descent** on a user-supplied cost closure. Identical signature and history convention to the parent's `pga_ascent`; internally negates the closure and forwards. Returns history in the **true sign** of the objective (monotonically non-increasing on a successful descent). |
+| `pga_descent(closure, params, *, step_size, num_iters, projector=None)` | `optimize` | Constant-step projected gradient **descent** on a user-supplied cost closure. Identical signature and history convention to `pga_ascent`; internally negates the closure and forwards. Returns history in the **true sign** of the objective (monotonically non-increasing on a successful descent). |
 
-The parent library `gaussian_dag` continues to provide the underlying
-numerical primitives — `logdet_hpd`, `get_K`, `hermitianize`,
-`pga_ascent`, `project_frobenius_ball`, `project_total_power` — and
-should be imported directly when needed. This library imports the
-same primitives internally rather than duplicating them.
+The underlying numerical primitives — `logdet_hpd`, `get_K`,
+`hermitianize`, `pga_ascent`, `project_frobenius_ball`,
+`project_total_power` — are provided directly by this package (vendored
+from `gaussian-dag`, byte-identical) and are importable from `cmi_dag`
+or its submodules (`cmi_dag.optimize`, `cmi_dag.projections`). No
+`gaussian-dag` install is required.
 
 ### Conventions
 
@@ -233,7 +239,7 @@ same primitives internally rather than duplicating them.
   covariance via `root_covs[r]`; the K-recursion base case enforces
   `K[(r, r')] = 0` for distinct roots (mutual independence).
 - **Storage.** As in the parent, only canonical lower-triangular
-  blocks are stored (`j ≥ k`). Use `gaussian_dag.get_K(K, a, b)` for
+  blocks are stored (`j ≥ k`). Use `cmi_dag.get_K(K, a, b)` for
   symmetric access; it applies the Hermitian flip `K_{ab} = K_{ba}^H`
   automatically.
 - **Rate-function format.** A `Summand` is `(α, A, B, C)`; a rate
@@ -248,7 +254,7 @@ same primitives internally rather than duplicating them.
   whatever real scalar the closure returns; the returned history is
   in the true sign of that cost (monotonically non-increasing on a
   successful descent). Internally it forwards to
-  `gaussian_dag.pga_ascent` after negation and flips the history
+  `cmi_dag.pga_ascent` after negation and flips the history
   sign. Use `pga_descent` when your natural objective is a *cost*
   (leakage, distortion, outage surrogate); use `pga_ascent` when it
   is a *benefit* (rate-region facet sum, MI). Same signature in both

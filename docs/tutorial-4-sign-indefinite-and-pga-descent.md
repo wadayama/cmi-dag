@@ -114,8 +114,8 @@ We use `pga_ascent` from the parent library together with
 Frobenius ball is the natural budget):
 
 ```python
-from gaussian_dag.optimize import pga_ascent
-from gaussian_dag.projections import project_frobenius_ball
+from cmi_dag.optimize import pga_ascent
+from cmi_dag.projections import project_frobenius_ball
 
 P = 8.0                                       # ||F||_F^2 <= P
 F = (((P / d) ** 0.5) * torch.eye(d, dtype=DTYPE, device=DEVICE)).clone()
@@ -194,11 +194,11 @@ print(f"I(X; Z): {descent_history[0]:.4f} -> {descent_history[-1]:.4f}")
 `pga_descent` internally negates the closure, forwards to
 `pga_ascent`, and flips the returned history's sign — so its API and
 contract match `pga_ascent` exactly except for the optimisation
-direction. The two functions live in different libraries:
+direction. Both functions live in this library:
 
 ```
-   gaussian_dag.optimize.pga_ascent           (parent: ascend)
-   cmi_dag.optimize.pga_descent      (child:  descend)
+   cmi_dag.optimize.pga_ascent       (ascend: rate, MI, throughput)
+   cmi_dag.optimize.pga_descent      (descend: leakage, distortion, outage)
 ```
 
 Pick whichever matches the *natural* sign of your objective so the

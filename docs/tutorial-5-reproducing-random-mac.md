@@ -232,8 +232,8 @@ The 9 matrices share a single total power budget. We use
 `project_total_power`:
 
 ```python
-from gaussian_dag.optimize import pga_ascent
-from gaussian_dag.projections import project_total_power
+from cmi_dag.optimize import pga_ascent
+from cmi_dag.projections import project_total_power
 
 NUM_ITERS = 800
 STEP_SIZE = 0.003

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from gaussian_dag.optimize import pga_ascent
+from cmi_dag.optimize import pga_ascent
 from cmi_dag.optimize import pga_descent
 
 DTYPE = torch.complex128
@@ -99,7 +99,7 @@ def test_history_in_true_sign():
 
 def test_descent_with_functional_projector():
     d = 2
-    from gaussian_dag.projections import project_frobenius_ball
+    from cmi_dag.projections import project_frobenius_ball
 
     F_target = 3.0 * torch.eye(d, dtype=DTYPE)
     F = torch.zeros(d, dtype=DTYPE).repeat(d, 1).requires_grad_(True)

@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from gaussian_dag.krecursion import compute_k_blocks
 from cmi_dag.krecursion import compute_k_blocks_multiroot
+from gdag_reference import compute_k_blocks  # single-root reference oracle
 
 DTYPE = torch.complex128
 
