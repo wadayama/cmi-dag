@@ -20,6 +20,7 @@ from cmi_dag.information import (
     logdet_hpd,
 )
 from cmi_dag.krecursion import (
+    compute_effective_channel,
     compute_k_blocks_multiroot,
     get_K,
     hermitianize,
@@ -30,6 +31,7 @@ from cmi_dag.rate_region import Summand, evaluate_rate_functions
 
 __all__ = [
     "Summand",
+    "compute_effective_channel",
     "compute_k_blocks_multiroot",
     "conditional_mutual_information_from_k",
     "evaluate_rate_functions",

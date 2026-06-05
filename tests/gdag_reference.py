@@ -11,6 +11,9 @@ the multi-root implementation in `cmi_dag` is checked:
 - `mutual_information_from_k` here is gaussian-dag's single-pair MI.
   `cmi_dag.conditional_mutual_information_from_k(A=[x], B=[y], C=[])` must
   reproduce it (see `test_unconditional_matches_parent_single_link`).
+- `compute_effective_channel` here is gaussian-dag's single-root effective
+  channel. `cmi_dag.compute_effective_channel` with `roots=[0]` must
+  reproduce its `G[j]` / `C` block-for-block.
 
 These are reference oracles, NOT part of cmi-dag's public API. cmi-dag's own
 multi-root recursion subsumes the single-root case; this file exists only so
@@ -90,3 +93,69 @@ def mutual_information_from_k(
     K_y_given_x = K_yy - K_yx @ Kxx_inv_Kxy
 
     return logdet_hpd(K_yy, jitter=jitter) - logdet_hpd(K_y_given_x, jitter=jitter)
+
+
+def compute_effective_channel(
+    num_nodes: int,
+    parents: dict[int, list[int]],
+    edge_mats: dict[tuple[int, int], torch.Tensor],
+    noise_covs: dict[int, torch.Tensor],
+    *,
+    source_dim: int | None = None,
+    symmetrize_self_blocks: bool = True,
+) -> tuple[dict[int, torch.Tensor], dict[tuple[int, int], torch.Tensor]]:
+    """Single-root effective channel (G, C) (gaussian-dag reference)."""
+    # Infer d_X and a reference tensor (for dtype/device) from edges into 0.
+    edge_into_root = next(
+        (edge_mats[(j, 0)] for j in range(1, num_nodes) if (j, 0) in edge_mats),
+        None,
+    )
+    if edge_into_root is not None:
+        inferred_dx = edge_into_root.shape[1]
+        if source_dim is not None and source_dim != inferred_dx:
+            raise ValueError(
+                f"source_dim={source_dim} disagrees with the dimension "
+                f"{inferred_dx} implied by an edge into node 0."
+            )
+        d_x = inferred_dx
+        ref = edge_into_root
+    else:
+        if source_dim is None:
+            raise ValueError(
+                "Cannot infer the source dimension d_X: node 0 has no "
+                "outgoing edge. Pass source_dim explicitly."
+            )
+        d_x = source_dim
+        ref = next(iter(edge_mats.values()), None)
+        if ref is None:
+            ref = next(iter(noise_covs.values()), None)
+        if ref is None:
+            raise ValueError(
+                "Cannot infer dtype/device: edge_mats and noise_covs are both "
+                "empty. Provide at least one edge or noise matrix."
+            )
+
+    # Effective-noise blocks: K-recursion with a zero input covariance.
+    zero_input = torch.zeros(d_x, d_x, dtype=ref.dtype, device=ref.device)
+    C = compute_k_blocks(
+        num_nodes,
+        parents,
+        edge_mats,
+        zero_input,
+        noise_covs,
+        symmetrize_self_blocks=symmetrize_self_blocks,
+    )
+
+    # Effective channel matrices via the forward gain recursion.
+    G: dict[int, torch.Tensor] = {
+        0: torch.eye(d_x, dtype=ref.dtype, device=ref.device)
+    }
+    for j in range(1, num_nodes):
+        acc: torch.Tensor | None = None
+        for i in parents[j]:
+            term = edge_mats[(j, i)] @ G[i]
+            acc = term if acc is None else acc + term
+        assert acc is not None  # parents[j] non-empty (validated by C above)
+        G[j] = acc
+
+    return G, C

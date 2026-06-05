@@ -85,6 +85,7 @@ SPECS = [
     ("project_total_power", "projections.py", "cmi_dag/projections.py"),
     ("compute_k_blocks", "krecursion.py", "tests/gdag_reference.py"),
     ("mutual_information_from_k", "information.py", "tests/gdag_reference.py"),
+    ("compute_effective_channel", "krecursion.py", "tests/gdag_reference.py"),
 ]
 
 

@@ -168,3 +168,158 @@ def compute_k_blocks_multiroot(
         K[(j, j)] = hermitianize(acc) if symmetrize_self_blocks else acc
 
     return K
+
+
+def compute_effective_channel(
+    num_nodes: int,
+    roots: Sequence[int],
+    parents: dict[int, list[int]],
+    edge_mats: dict[tuple[int, int], torch.Tensor],
+    noise_covs: dict[int, torch.Tensor],
+    *,
+    source_dims: dict[int, int] | None = None,
+    symmetrize_self_blocks: bool = True,
+) -> tuple[dict[tuple[int, int], torch.Tensor], dict[tuple[int, int], torch.Tensor]]:
+    """Multi-root effective-channel representation (G, C) of a linear Gaussian DAG.
+
+    Collapses the multi-root DAG to an equivalent multi-source linear Gaussian
+    channel
+        Y = sum_{r in roots} G_M^{(r)} X_r + R_M,   {X_r} mutually independent,
+    exposing the per-root effective channel matrices G_j^{(r)} (gain from
+    source root r to node j) and the effective-noise covariance blocks
+    C_{jk} = E[R_j R_k^H].
+
+    The per-root effective channel matrices follow, for each root r, the base
+    case
+        G_r^{(r)}  = I_{d_r},
+        G_{r'}^{(r)} = 0           (other root r' != r; roots are independent),
+    and the forward recursion over non-root nodes
+        G_j^{(r)} = sum_{i in Pa(j)} A_{ji} G_i^{(r)},
+    with G_j^{(r)} of shape (d_j, d_r). The effective-noise blocks obey the
+    multi-root K-recursion with all root covariances set to zero; they are
+    obtained here by reusing `compute_k_blocks_multiroot` with zero
+    `root_covs`, which is exact because that recursion is affine in its
+    root-covariance seeds. Together they satisfy the decomposition
+        K_{jk} = sum_{r in roots} G_j^{(r)} Sigma_r G_k^{(r)H} + C_{jk}.
+
+    This is the multi-root generalization of the single-root
+    effective-channel representation (Remark "Effective-channel
+    representation" of the gaussian-dag paper); with a single root
+    (`roots=[0]`) it reduces to `gaussian_dag.compute_effective_channel`.
+    The single-root case is published; the multi-source generalization here
+    accompanies the multi-terminal / conditional-MI companion paper, which is
+    in preparation.
+
+    Args:
+        num_nodes: Total number of nodes M (indices 0..M-1).
+        roots: Indices of the root nodes. Must be exactly the prefix
+            {0, ..., K-1} in topological order (same convention as
+            `compute_k_blocks_multiroot`).
+        parents: parents[j] = list of parent indices for non-root j. Must
+            satisfy i < j for every i in parents[j].
+        edge_mats: edge_mats[(j, i)] = A_{ji}, shape (d_j, d_i).
+        noise_covs: noise_covs[j] = Sigma_j (shape d_j x d_j) for every
+            non-root j. Note: the root covariances are intentionally NOT an
+            argument; (G, C) describe the channel and are independent of them.
+        source_dims: Optional dict {r: d_r} giving each root's dimension. If
+            None, each d_r is inferred from any edge into root r
+            (edge_mats[(j, r)] has shape (d_j, d_r)).
+        symmetrize_self_blocks: If True, apply (A + A^H)/2 to each C self-cov
+            block (forwarded to `compute_k_blocks_multiroot`).
+
+    Returns:
+        Tuple (G, C):
+        - G: dict {(r, j): G_j^{(r)}} for r in roots and 0 <= j < num_nodes,
+          each of shape (d_j, d_r). G[(r, r)] = I_{d_r} and G[(r, r')] = 0 for
+          distinct roots r, r'.
+        - C: dict of canonical blocks C[(j, k)] for 0 <= k <= j < num_nodes
+          (same key convention as `compute_k_blocks_multiroot`; use `get_K`
+          for the Hermitian flip), with all root self-blocks C[(r, r)] = 0.
+        Both are differentiable in `edge_mats` (and C in `noise_covs`) via
+        PyTorch autograd. Newly allocated tensors inherit dtype/device from
+        the input tensors.
+
+    Raises:
+        ValueError: if `roots` is not the prefix {0, ..., K-1}, if a root's
+            dimension cannot be inferred (no edge into it and no `source_dims`
+            entry), if dtype/device cannot be inferred, if a provided
+            `source_dims[r]` disagrees with the dimension implied by an edge
+            into root r, or via the topological-order / missing-parent /
+            missing-noise checks inherited from `compute_k_blocks_multiroot`.
+    """
+    roots = sorted(roots)
+    num_roots = len(roots)
+    if roots != list(range(num_roots)):
+        raise ValueError(
+            f"roots must be the prefix {{0, ..., K-1}} in topological order, "
+            f"got {roots}."
+        )
+
+    # A reference tensor for dtype/device (any edge or noise matrix).
+    ref = next(iter(edge_mats.values()), None)
+    if ref is None:
+        ref = next(iter(noise_covs.values()), None)
+    if ref is None:
+        raise ValueError(
+            "Cannot infer dtype/device: edge_mats and noise_covs are both "
+            "empty. Provide at least one edge or noise matrix."
+        )
+
+    # Resolve each root's dimension d_r (explicit override or edge inference).
+    dims: dict[int, int] = {}
+    for r in roots:
+        edge_into_r = next(
+            (edge_mats[(j, r)] for j in range(num_nodes) if (j, r) in edge_mats),
+            None,
+        )
+        inferred = edge_into_r.shape[1] if edge_into_r is not None else None
+        explicit = None if source_dims is None else source_dims.get(r)
+        if explicit is not None and inferred is not None and explicit != inferred:
+            raise ValueError(
+                f"source_dims[{r}]={explicit} disagrees with the dimension "
+                f"{inferred} implied by an edge into root {r}."
+            )
+        d_r = explicit if explicit is not None else inferred
+        if d_r is None:
+            raise ValueError(
+                f"Cannot infer the dimension of root {r}: it has no outgoing "
+                f"edge. Pass source_dims with an entry for root {r}."
+            )
+        dims[r] = d_r
+
+    # Effective-noise blocks: multi-root K-recursion with zero root covariances.
+    zero_root_covs = {
+        r: torch.zeros(dims[r], dims[r], dtype=ref.dtype, device=ref.device)
+        for r in roots
+    }
+    C = compute_k_blocks_multiroot(
+        num_nodes,
+        roots,
+        parents,
+        edge_mats,
+        zero_root_covs,
+        noise_covs,
+        symmetrize_self_blocks=symmetrize_self_blocks,
+    )
+
+    # Per-root effective channel matrices via the forward gain recursion.
+    G: dict[tuple[int, int], torch.Tensor] = {}
+    for r in roots:
+        # Base case over the root nodes.
+        for r2 in roots:
+            if r2 == r:
+                G[(r, r2)] = torch.eye(dims[r], dtype=ref.dtype, device=ref.device)
+            else:
+                G[(r, r2)] = torch.zeros(
+                    dims[r2], dims[r], dtype=ref.dtype, device=ref.device
+                )
+        # Non-root nodes, in topological order.
+        for j in range(num_roots, num_nodes):
+            acc: torch.Tensor | None = None
+            for i in parents[j]:
+                term = edge_mats[(j, i)] @ G[(r, i)]
+                acc = term if acc is None else acc + term
+            assert acc is not None  # parents[j] non-empty (validated by C above)
+            G[(r, j)] = acc
+
+    return G, C
