@@ -4,10 +4,9 @@
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue.svg)](https://www.python.org/)
 
 Conditional mutual information and gradient-based optimization for
-multi-terminal linear Gaussian directed acyclic graphs (DAGs). Sister
-library to [`gaussian-dag`](https://github.com/wadayama/gaussian-dag),
-extending the parent's single-root K-recursion to the **multi-root**
-case and adding a closed-form **conditional mutual information** layer
+multi-terminal linear Gaussian directed acyclic graphs (DAGs).
+Extends the single-root K-recursion to the **multi-root** case and
+adds a closed-form **conditional mutual information** layer
 
 ```
 I(V_A; V_B | V_C) = log det Σ_{A|C} − log det Σ_{A|BC},
@@ -31,6 +30,19 @@ in a single backward sweep. No per-topology gradient derivation is
 required. Every component is end-to-end differentiable, device-agnostic
 (CPU / CUDA), and built on top of the parent library's numerical
 primitives — there is no duplicated K-recursion or Cholesky code.
+
+## Sister libraries
+
+`cmi-dag` is one of four standalone members of the Gaussian-DAG
+family, all sharing the same K-recursion / complex-autograd /
+projected-gradient design and vendoring identical numerical primitives:
+
+| Library | Scope | When to use |
+| --- | --- | --- |
+| [`gaussian-dag`](https://github.com/wadayama/gaussian-dag) | Single-pair MI on deterministic linear Gaussian DAGs (parent). | Single-link MIMO, multi-hop AF relay, diamond, input-covariance shaping. |
+| [`cmi-dag`](https://github.com/wadayama/cmi-dag) | Multi-root + conditional MI on arbitrary disjoint subsets; rate-region facets. | MAC, BC, IC, wiretap, multi-terminal rate regions. |
+| [`bussgang-dag`](https://github.com/wadayama/bussgang-dag) | Nonlinear node elements via Bussgang surrogate MI. | Soft-clipping PAs, low-resolution ADCs, hard-decision relays. |
+| [`fading-dag`](https://github.com/wadayama/fading-dag) | Random channel matrices via mini-batched Monte Carlo; ergodic capacity and outage. | Rayleigh / Ricean / Kronecker-correlated fading. |
 
 > **Funding.** This work was supported by JST, CRONOS, Japan
 > Grant Number **JPMJCS25N5**.
