@@ -32,10 +32,6 @@ required. Every component is end-to-end differentiable, device-agnostic
 (CPU / CUDA), and built on top of the parent library's numerical
 primitives — there is no duplicated K-recursion or Cholesky code.
 
-![Rate-region maximization on a 2-user MIMO MAC](docs/figures/rate_region_evolution.png)
-
-*Joint precoder optimization on a 2-user vector Gaussian MAC: the rate-region pentagon expands monotonically over 120 projected-gradient iterations (left), while the facet-sum objective `U = I_1 + I_2 + I_{12}` rises in lock-step (right). Reproduced by `examples/rate_region_maximization.py` — one closure, three CMI calls, one backward sweep.*
-
 > **Funding.** This work was supported by JST, CRONOS, Japan
 > Grant Number **JPMJCS25N5**.
 
@@ -122,12 +118,11 @@ Each facet is `I(V_A; V_B | V_C) = log det Σ_{A|C} − log det Σ_{A|BC}`,
 where the two conditional covariances are sub-block Schur complements
 of the support covariance `Σ_{S,S}` over `S = A ∪ B ∪ C`:
 
-![Sub-block Schur complements of the support covariance](docs/figures/schur.png)
+<p align="center">
+  <img src="docs/figures/schur.png" alt="Sub-block Schur complements of the support covariance" width="500">
+</p>
 
-*Sub-block Schur complements of `Σ_{S,S}`: (a) `Σ_{A|C}` from the
-`A∪C` sub-block of the support covariance; (b) `Σ_{A|BC}` from the
-`A∪B∪C` sub-block. The CMI is `log det Σ_{A|C} − log det Σ_{A|BC}`,
-read in one call from the K-blocks of a single forward pass.*
+<p align="center"><em>Sub-block Schur complements of <code>Σ_{S,S}</code>: (a) <code>Σ_{A|C}</code> from the <code>A∪C</code> sub-block; (b) <code>Σ_{A|BC}</code> from the <code>A∪B∪C</code> sub-block. The CMI is <code>log det Σ_{A|C} − log det Σ_{A|BC}</code>, read in one call from the K-blocks of a single forward pass.</em></p>
 
 In code each facet is then a single line:
 
@@ -214,6 +209,12 @@ print(f"U: {history[0]:.4f} -> {history[-1]:.4f} nats")
 
 The pentagon expands monotonically over the iterations. See
 `examples/rate_region_maximization.py` for the full plotting code.
+
+<p align="center">
+  <img src="docs/figures/rate_region_evolution.png" alt="Rate-region maximization on a 2-user MIMO MAC" width="420">
+</p>
+
+<p align="center"><em>Joint precoder optimization on a 2-user vector Gaussian MAC: the rate-region pentagon expands monotonically over 120 projected-gradient iterations (top), while the facet-sum objective <code>U = I_1 + I_2 + I_{12}</code> rises in lock-step (bottom). One closure, three CMI calls, one backward sweep.</em></p>
 
 ---
 
@@ -304,15 +305,11 @@ under 15 seconds.
 | `uv run python examples/secure_precoding.py` | Sign-indefinite secrecy-rate objective `I(X; Y) − I(X; Z)` on a MIMO wiretap channel; the precoder shapes its subspace to drive eavesdropper information down while keeping legitimate information high. |
 | `uv run python examples/random_mac.py` | The same MAC-facet-sum objective scaled to a randomly generated 12-node multi-hop multi-source network with 9 relay processing matrices and a single shared total-power budget. |
 
-![Rate-region maximization on a random multi-hop multi-source DAG](docs/figures/random_mac.png)
+<p align="center">
+  <img src="docs/figures/random_mac.png" alt="Rate-region maximization on a random multi-hop multi-source DAG" width="450">
+</p>
 
-*Output of `examples/random_mac.py`: (a) a randomly generated 12-node
-multi-source multi-hop DAG with two source roots `s_1, s_2` and one
-sink `t`; node colour encodes the per-node Frobenius norm `‖F_i‖^2_F`
-after optimization. (b) The three pentagon facets and the facet-sum
-objective `U` rise jointly under projected-gradient ascent on the
-shared total-power budget — the same loop as the 2-user MAC example
-above, with no per-topology code change.*
+<p align="center"><em>Output of <code>examples/random_mac.py</code>: (a) a randomly generated 12-node multi-source multi-hop DAG with two source roots <code>s_1, s_2</code> and one sink <code>t</code>; node colour encodes the per-node Frobenius norm <code>‖F_i‖^2_F</code> after optimization. (b) The three pentagon facets and the facet-sum objective <code>U</code> rise jointly under projected-gradient ascent — the same loop as the 2-user MAC example above, with no per-topology code change.</em></p>
 
 See [`examples/README.md`](examples/README.md) for output conventions
 and reproducibility notes.
