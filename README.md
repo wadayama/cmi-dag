@@ -252,7 +252,7 @@ from cmi_dag import (
 
 | Symbol | Module | Purpose |
 | --- | --- | --- |
-| `compute_k_blocks_multiroot(num_nodes, roots, parents, edge_mats, root_covs, noise_covs, *, symmetrize_self_blocks=True)` | `krecursion` | Forward pass of the K-recursion for a DAG with multiple independent roots `{0, …, K-1}`. Returns the canonical block dict `K[(j, k)]` (`j ≥ k`). Reduces to the parent's `compute_k_blocks` when `len(roots) == 1`. |
+| `compute_k_blocks_multiroot(num_nodes, roots, parents, edge_mats, root_covs, noise_covs, *, cross_root_covs=None, symmetrize_self_blocks=True)` | `krecursion` | Forward pass of the K-recursion for a DAG with multiple roots `{0, …, K-1}`. Returns the canonical block dict `K[(j, k)]` (`j ≥ k`). Roots are independent by default; passing `cross_root_covs={(r, r'): Σ_{r,r'}}` (canonical `r > r'`) seeds correlated sources (validated as joint Hermitian PD via Cholesky). Reduces to the parent's `compute_k_blocks` when `len(roots) == 1`. |
 | `compute_effective_channel(num_nodes, roots, parents, edge_mats, noise_covs, *, source_dims=None, symmetrize_self_blocks=True)` | `krecursion` | Collapse the multi-root DAG to an equivalent multi-source channel `Y = Σ_r G_M^{(r)} X_r + R_M`. Returns `(G, C)`: per-root effective channel matrices `G[(r, j)]` (shape `d_j × d_r`, `G[(r,r)]=I`, `G[(r,r')]=0`) and effective-noise blocks `C[(j, k)]`. Satisfies `K_{jk} = Σ_r G_j^{(r)} Σ_r G_k^{(r)H} + C_{jk}`. Reduces to `gaussian_dag.compute_effective_channel` when `len(roots) == 1`. Differentiable. |
 | `conditional_mutual_information_from_k(K, A, B, C=(), *, jitter=0.0)` | `information` | `I(V_A; V_B \| V_C) = log det Σ_{A\|C} − log det Σ_{A\|BC}` for arbitrary disjoint subsets `A, B, C` of the node set. Schur complement via `torch.linalg.solve`; log-det via the parent's Cholesky-based `logdet_hpd`. Differentiable. |
 | `Summand` | `rate_region` | Type alias `tuple[float, Sequence[int], Sequence[int], Sequence[int]]` representing one term `α · I(V_A; V_B \| V_C)` of a rate function. |
@@ -272,8 +272,15 @@ or its submodules (`cmi_dag.optimize`, `cmi_dag.projections`). No
   `{0, 1, …, K-1}` (by topological-order convention); they must be a
   contiguous prefix of `{0, …, num_nodes-1}` and `K < num_nodes`
   (at least one non-root). Each root carries its own input
-  covariance via `root_covs[r]`; the K-recursion base case enforces
-  `K[(r, r')] = 0` for distinct roots (mutual independence).
+  covariance via `root_covs[r]`; by default the K-recursion base case
+  enforces `K[(r, r')] = 0` for distinct roots (mutual independence).
+  To model **correlated sources** (multi-terminal source compression,
+  Slepian–Wolf / CEO, common information), pass an optional
+  `cross_root_covs={(r, r'): Σ_{r,r'}}` with canonical `r > r'`; the
+  assembled joint root covariance `Σ_{R,R}` is validated as Hermitian
+  PD by an autograd-external Cholesky check. The downstream conditional
+  MI, rate-function, and optimization layers are K-block generic and
+  work unchanged with correlated sources.
 - **Storage.** As in the parent, only canonical lower-triangular
   blocks are stored (`j ≥ k`). Use `cmi_dag.get_K(K, a, b)` for
   symmetric access; it applies the Hermitian flip `K_{ab} = K_{ba}^H`

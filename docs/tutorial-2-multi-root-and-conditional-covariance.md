@@ -104,6 +104,64 @@ formula uses.
 > the Hermitian flip `K_{a, b} = K_{b, a}^H` for you. The library's
 > internals (and the next section) use this accessor throughout.
 
+### 2bis. Correlated sources (optional)
+
+The default base case `K_{r, r'} = 0` for distinct roots models the
+common case of **independent** user inputs (e.g., the MAC). For
+multi-terminal **source compression** problems — Slepian–Wolf, the CEO
+problem, common-information, distributed estimation — the sources are
+typically **correlated**, and we want a non-zero base case
+`K_{r, r'} = Σ_{r, r'}`.
+
+`compute_k_blocks_multiroot` accepts an optional `cross_root_covs`
+argument for exactly this purpose:
+
+```python
+import torch
+from cmi_dag import compute_k_blocks_multiroot, conditional_mutual_information_from_k
+
+d = 1
+DTYPE = torch.complex128
+rho = 0.6                                # correlation coefficient
+sigma_z = 0.5                            # observation noise
+
+K = compute_k_blocks_multiroot(
+    num_nodes=3, roots=[0, 1], parents={2: [0, 1]},
+    edge_mats={(2, 0): torch.eye(d, dtype=DTYPE),
+               (2, 1): torch.eye(d, dtype=DTYPE)},
+    root_covs={0: torch.eye(d, dtype=DTYPE),
+               1: torch.eye(d, dtype=DTYPE)},
+    noise_covs={2: sigma_z**2 * torch.eye(d, dtype=DTYPE)},
+    cross_root_covs={(1, 0): torch.tensor([[rho + 0.0j]], dtype=DTYPE)},
+)
+# Native source correlation, present even without observing Y.
+I_X1_X2 = conditional_mutual_information_from_k(K, A=[0], B=[1])
+# Residual correlation given the channel output (can be larger or smaller).
+I_X1_X2_given_Y = conditional_mutual_information_from_k(K, A=[0], B=[1], C=[2])
+print(I_X1_X2.item(), I_X1_X2_given_Y.item())
+```
+
+Key points:
+
+- **Key convention.** `cross_root_covs[(r, r')]` requires `r > r'` (canonical
+  lower-triangular). The upper triangle `Σ_{r', r} = Σ_{r, r'}^H` is
+  reconstructed automatically by `get_K`.
+- **PD validation.** When `cross_root_covs` is non-empty, the assembled
+  `Σ_{R, R}` (diagonal `root_covs[r]`, off-diagonal `cross_root_covs[(r, r')]`)
+  is checked for Hermitian positive definiteness by a Cholesky
+  factorisation performed *outside* the autograd tape. Failure raises a
+  diagnostic `ValueError`.
+- **Backward compatibility.** Omitting the argument (or passing `None` /
+  `{}`) is byte-identical to the existing independent-roots code path.
+- **Downstream.** `conditional_mutual_information_from_k`,
+  `evaluate_rate_functions`, and the optimization layer are K-block
+  generic and require no changes — they work with correlated-source
+  K-blocks unchanged.
+
+See [`examples/correlated_sources_cmi.py`](../examples/correlated_sources_cmi.py)
+for a runnable example sweeping the correlation coefficient and plotting
+`I(X_1; X_2)` and `I(X_1; X_2 | Y)`.
+
 ---
 
 ## 3. Reading K-blocks

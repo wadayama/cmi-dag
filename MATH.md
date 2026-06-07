@@ -97,8 +97,18 @@ vector $V_j \in \mathbb{C}^{d_j}$. For a root $r \in \mathcal{R}$,
 
 $$V_r \sim \mathcal{CN}(0, \Sigma_r), \qquad r \in \mathcal{R}, \tag{2.1}$$
 
-and the user inputs $\{V_r\}_{r \in \mathcal{R}}$ are **mutually
-independent**. For each non-root node $j$ with parents $\mathrm{Pa}(j)$,
+and by default the user inputs $\{V_r\}_{r \in \mathcal{R}}$ are
+**mutually independent**. The implementation also admits the more
+general case of **correlated sources** by allowing arbitrary
+cross-covariances $\Sigma_{r, r'} := \mathbb{E}[V_r V_{r'}^{\mathsf H}]$
+(useful for Slepian–Wolf / CEO / common-information problems and
+multi-terminal source compression), subject only to the
+joint-positivity requirement that the assembled source covariance
+$\Sigma_{\mathcal{R}\mathcal{R}}$ (block matrix with diagonals
+$\Sigma_r$ and off-diagonals $\Sigma_{r, r'}$) is Hermitian positive
+definite. The independent case is the special case
+$\Sigma_{r, r'} = 0$ for $r \neq r'$. For each non-root node $j$ with
+parents $\mathrm{Pa}(j)$,
 
 $$V_j = \sum_{i \in \mathrm{Pa}(j)} A_{ji} V_i + Z_j, \qquad Z_j \sim \mathcal{CN}(0, \Sigma_j), \tag{2.2}$$
 
@@ -129,9 +139,15 @@ $$K_{jk} := \mathbb{E}[V_j V_k^{\mathsf{H}}], \qquad j, k \in \mathcal{V},$$
 
 in topological order from the multi-root base case
 
-$$K_{rr} = \Sigma_r \;\; (r \in \mathcal{R}), \qquad K_{r r'} = 0 \;\; (r \neq r', \; r, r' \in \mathcal{R}). \tag{2.4}$$
+$$K_{rr} = \Sigma_r \;\; (r \in \mathcal{R}), \qquad K_{r r'} = \Sigma_{r, r'} \;\; (r > r', \; r, r' \in \mathcal{R}). \tag{2.4}$$
 
-For each non-root node $j$ and $k \leq j$,
+The default is $\Sigma_{r, r'} = 0$ (mutually independent sources); a
+non-trivial seed $\Sigma_{r, r'} \neq 0$ corresponds to correlated
+sources and is supplied via the optional `cross_root_covs` argument of
+`compute_k_blocks_multiroot`, subject to the joint Hermitian-PD
+constraint on $\Sigma_{\mathcal{R}\mathcal{R}}$ (validated internally
+by a Cholesky factorisation). For each non-root node $j$ and
+$k \leq j$,
 
 $$K_{jk} = \begin{cases} \sum_{i \in \mathrm{Pa}(j)} A_{ji} K_{ik} & k < j, \\ \sum_{i, i' \in \mathrm{Pa}(j)} A_{ji} K_{i i'} A_{j i'}^{\mathsf{H}} + \Sigma_j & k = j, \end{cases} \tag{2.5}$$
 
@@ -139,10 +155,15 @@ with the Hermitian-flip convention $K_{ab} = K_{ba}^{\mathsf{H}}$ for
 $a < b$. Each step uses only matrix products, sums, and Hermitian
 transposes, so the full set $\{K_{jk}\}_{j \geq k}$ is a smooth
 function of $\eta$ delivered in a single forward sweep —
-`compute_k_blocks_multiroot` in `cmi_dag.krecursion`.
+`compute_k_blocks_multiroot` in `cmi_dag.krecursion`. Forward
+recursion (2.5) is unchanged between the independent and correlated
+cases because it is affine in the base seed (2.4); the independent and
+correlated implementations share a single code path.
 
 The single-root case $K = 1$ reduces to the original
-`gaussian-dag` K-recursion.
+`gaussian-dag` K-recursion. The closed-form CMI proposition (Sec. 3)
+depends only on the assembled K-blocks, so it carries over verbatim to
+correlated sources.
 
 ---
 

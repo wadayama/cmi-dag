@@ -1,7 +1,11 @@
 """Multi-root K-recursion for linear Gaussian DAGs.
 
 Model (0-based indexing, multi-root extension of gaussian_dag.krecursion):
-    Roots r in {0, ..., K-1}:  V_r ~ CN(0, Sigma_r), mutually independent.
+    Roots r in {0, ..., K-1}:  V_r ~ CN(0, Sigma_r),
+        mutually independent by default; optional cross-covariances
+        Sigma_{r,r'} = E[V_r V_{r'}^H] may be supplied to model correlated
+        sources (relevant to multi-terminal source compression, Slepian-Wolf
+        / CEO problems, common-information).
     Non-roots j in {K, ..., M-1}:
         V_j = sum_{i in Pa(j)} A_{ji} V_i + Z_j,  Z_j ~ CN(0, Sigma_j),
     with all Z_j mutually independent and independent of the user inputs.
@@ -50,6 +54,164 @@ def get_K(
     return K[(b, a)].mH
 
 
+def _assemble_root_block(
+    roots: Sequence[int],
+    root_covs: dict[int, torch.Tensor],
+    cross_root_covs: dict[tuple[int, int], torch.Tensor],
+) -> torch.Tensor:
+    """Assemble the joint root covariance matrix Sigma_{R, R}.
+
+    Stack the per-root self-blocks Sigma_r along the diagonal and place the
+    user-supplied cross-blocks Sigma_{r, r'} (key convention r > r') in the
+    lower triangle, with the Hermitian transpose Sigma_{r,r'}^H in the upper
+    triangle. Missing cross keys default to zero.
+
+    The returned tensor is used only for the joint-PD validation Cholesky
+    check; its autograd graph (if any) is discarded by the caller.
+
+    Args:
+        roots: Sorted prefix {0, ..., K-1}.
+        root_covs: root_covs[r] = Sigma_r (shape d_r x d_r) for r in roots.
+        cross_root_covs: cross_root_covs[(r, r')] = Sigma_{r, r'}
+            (shape d_r x d_{r'}) for canonical pairs r > r'.
+
+    Returns:
+        Hermitian matrix of shape (sum_r d_r, sum_r d_r) on the same dtype
+        and device as the inputs.
+    """
+    row_strips = []
+    for r in roots:
+        blocks = []
+        for r2 in roots:
+            if r == r2:
+                blocks.append(root_covs[r])
+            elif r > r2:
+                sigma = cross_root_covs.get((r, r2))
+                if sigma is None:
+                    blocks.append(
+                        torch.zeros(
+                            root_covs[r].shape[-1],
+                            root_covs[r2].shape[-1],
+                            dtype=root_covs[r].dtype,
+                            device=root_covs[r].device,
+                        )
+                    )
+                else:
+                    blocks.append(sigma)
+            else:  # r < r2: Hermitian transpose of the lower-triangular block
+                sigma = cross_root_covs.get((r2, r))
+                if sigma is None:
+                    blocks.append(
+                        torch.zeros(
+                            root_covs[r].shape[-1],
+                            root_covs[r2].shape[-1],
+                            dtype=root_covs[r].dtype,
+                            device=root_covs[r].device,
+                        )
+                    )
+                else:
+                    blocks.append(sigma.mH)
+        row_strips.append(torch.cat(blocks, dim=-1))
+    return torch.cat(row_strips, dim=-2)
+
+
+def _validate_cross_root_covs(
+    roots: Sequence[int],
+    root_covs: dict[int, torch.Tensor],
+    cross_root_covs: dict[tuple[int, int], torch.Tensor],
+) -> None:
+    """Validate the cross-root covariance dict and check joint PD-ness.
+
+    Performs (in order):
+      1. Key-shape checks: each key is (r, r') with r > r' and both in roots.
+         Self-keys (r, r) are rejected with a hint to use root_covs.
+         Reversed keys (r', r) with r' > r are rejected with a hint that the
+         canonical convention is lower-triangular (r > r').
+      2. Tensor-shape checks: cross_root_covs[(r, r')] has shape
+         (d_r, d_{r'}) consistent with root_covs[r] and root_covs[r'].
+      3. Joint Hermitian-PD check on the assembled Sigma_{R, R} via
+         torch.linalg.cholesky_ex. Performed outside autograd by detaching
+         the assembled matrix (only the info code is consumed).
+
+    Args:
+        roots: Sorted prefix {0, ..., K-1}.
+        root_covs: Per-root self-covariances.
+        cross_root_covs: User-supplied cross blocks (may be empty).
+
+    Raises:
+        ValueError: on any of the above failures, with a diagnostic message.
+    """
+    roots_set = set(roots)
+    for key in cross_root_covs:
+        if not (isinstance(key, tuple) and len(key) == 2):
+            raise ValueError(
+                f"cross_root_covs key must be a 2-tuple of ints, got {key!r}."
+            )
+        r, r2 = key
+        if r == r2:
+            raise ValueError(
+                f"cross_root_covs key ({r}, {r2}) is a self-pair; "
+                "self-covariances must be supplied via root_covs[r] instead."
+            )
+        if r < r2:
+            raise ValueError(
+                f"cross_root_covs key ({r}, {r2}) violates the canonical "
+                "lower-triangular convention (r > r'). Provide Sigma_{r, r'} "
+                f"under the key ({r2}, {r}) instead; the upper triangle is "
+                "obtained internally via the Hermitian flip."
+            )
+        if r not in roots_set or r2 not in roots_set:
+            raise ValueError(
+                f"cross_root_covs key ({r}, {r2}) refers to a non-root index; "
+                f"roots are {list(roots)}."
+            )
+        sigma = cross_root_covs[key]
+        d_r = root_covs[r].shape[-1]
+        d_r2 = root_covs[r2].shape[-1]
+        if sigma.shape[-2:] != (d_r, d_r2):
+            raise ValueError(
+                f"cross_root_covs[({r}, {r2})] has shape {tuple(sigma.shape)}, "
+                f"expected ({d_r}, {d_r2}) to match root_covs."
+            )
+        if sigma.dtype != root_covs[r].dtype:
+            raise ValueError(
+                f"cross_root_covs[({r}, {r2})] dtype {sigma.dtype} does not "
+                f"match root_covs[{r}] dtype {root_covs[r].dtype}."
+            )
+        if sigma.device != root_covs[r].device:
+            raise ValueError(
+                f"cross_root_covs[({r}, {r2})] device {sigma.device} does not "
+                f"match root_covs[{r}] device {root_covs[r].device}."
+            )
+
+    # Joint PD check (assembled Sigma_{R, R}). Detach so the Cholesky check
+    # cannot leak into the autograd graph of downstream K-blocks.
+    Sigma_RR = _assemble_root_block(roots, root_covs, cross_root_covs).detach()
+    Sigma_RR = 0.5 * (Sigma_RR + Sigma_RR.mH)
+    _, info = torch.linalg.cholesky_ex(Sigma_RR, check_errors=False)
+    info_value = int(info.item())
+    if info_value != 0:
+        # Heuristic: map the leading-minor index back to a root pair via
+        # cumulative dimensions.
+        cum = 0
+        which_root = roots[-1]
+        for r in roots:
+            d_r = root_covs[r].shape[-1]
+            if cum + d_r >= info_value:
+                which_root = r
+                break
+            cum += d_r
+        raise ValueError(
+            "Joint root covariance Sigma_{R, R} (assembled from root_covs "
+            "and cross_root_covs) is not Hermitian positive definite: "
+            f"Cholesky failed at leading minor of order {info_value} "
+            f"(within the block of root {which_root}). Common remedies: "
+            "(1) reduce the magnitude of cross_root_covs entries; "
+            "(2) inflate root_covs diagonals; (3) verify that "
+            "cross_root_covs keys follow the canonical (r > r') convention."
+        )
+
+
 def compute_k_blocks_multiroot(
     num_nodes: int,
     roots: Sequence[int],
@@ -58,17 +220,25 @@ def compute_k_blocks_multiroot(
     root_covs: dict[int, torch.Tensor],
     noise_covs: dict[int, torch.Tensor],
     *,
+    cross_root_covs: dict[tuple[int, int], torch.Tensor] | None = None,
     symmetrize_self_blocks: bool = True,
 ) -> dict[tuple[int, int], torch.Tensor]:
     """Compute all canonical K-blocks K_{jk} for a multi-root linear Gaussian DAG.
 
     Multi-root analog of `gaussian_dag.compute_k_blocks`: the recursion
     starts from the per-root base case
-        K_{rr}   = Sigma_r       (root input covariance, r in `roots`),
-        K_{rr'}  = 0             (mutual independence of distinct roots),
+        K_{rr}   = Sigma_r              (root input covariance, r in `roots`),
+        K_{rr'}  = Sigma_{r, r'}        (cross covariance, r > r'; default 0),
     and then proceeds through the non-root nodes j in topological order:
         K_{jk}   = sum_{i in Pa(j)} A_{ji} K_{ik}                       (k < j)
         K_{jj}   = sum_{i,i' in Pa(j)} A_{ji} K_{ii'} A_{ji'}^H + Sigma_j.
+
+    By default the roots are mutually independent (Sigma_{r, r'} = 0). The
+    optional `cross_root_covs` argument seeds non-zero cross covariances —
+    useful for multi-terminal source compression (Slepian-Wolf / CEO /
+    common-information settings). The forward recursion (2.5) is unchanged
+    because it is affine in the base seed; the independent and correlated
+    cases share a single implementation path.
 
     All newly allocated tensors (the zero off-diagonal root blocks) inherit
     `dtype` and `device` from `root_covs`, so the function is fully
@@ -89,20 +259,37 @@ def compute_k_blocks_multiroot(
             the input covariance of user / source r.
         noise_covs: noise_covs[j] = Sigma_j (shape d_j x d_j) for every
             non-root j.
+        cross_root_covs: Optional dict {(r, r'): Sigma_{r, r'}} encoding
+            cross-covariances E[V_r V_{r'}^H] of distinct roots. Keys must
+            satisfy r > r' (canonical lower-triangular convention; the upper
+            triangle Sigma_{r', r} = Sigma_{r, r'}^H is reconstructed
+            internally). Missing keys default to zero (independent roots).
+            When non-empty, the assembled joint root covariance
+            Sigma_{R, R} is checked to be Hermitian positive definite by a
+            Cholesky factorisation performed outside the autograd tape;
+            failure raises ValueError. If `None` or `{}` (the default),
+            both validation and the new code path are skipped and the
+            behaviour is byte-identical to the independent-roots case.
         symmetrize_self_blocks: If True, apply (A + A^H)/2 to each self-cov
             block K_{jj} (including the per-root K_{rr}) to enforce
-            Hermitian structure numerically.
+            Hermitian structure numerically. Cross blocks K_{r, r'} for
+            r != r' are not symmetrized (they are off-diagonal sub-blocks of
+            the joint root covariance, not self-blocks).
 
     Returns:
         Dictionary K with keys (j, k) for 0 <= k <= j < num_nodes. Every
-        block is differentiable through `edge_mats`, `root_covs`, and
-        `noise_covs` via PyTorch autograd.
+        block is differentiable through `edge_mats`, `root_covs`,
+        `noise_covs`, and (when supplied) `cross_root_covs` via PyTorch
+        autograd.
 
     Raises:
         ValueError: if `roots` is not the prefix {0, ..., K-1} in
             topological order, if K >= num_nodes (no non-root node), if a
-            non-root has empty / out-of-order parents, or if a non-root is
-            missing from `noise_covs`.
+            non-root has empty / out-of-order parents, if a non-root is
+            missing from `noise_covs`, if `cross_root_covs` violates the
+            key-shape / tensor-shape / dtype / device contract, or if the
+            assembled joint root covariance is not Hermitian positive
+            definite.
     """
     roots = sorted(roots)
     num_roots = len(roots)
@@ -121,20 +308,29 @@ def compute_k_blocks_multiroot(
         if r not in root_covs:
             raise ValueError(f"root_covs is missing the entry for root {r}.")
 
+    if cross_root_covs is not None and len(cross_root_covs) > 0:
+        _validate_cross_root_covs(roots, root_covs, cross_root_covs)
+    else:
+        cross_root_covs = {}
+
     K: dict[tuple[int, int], torch.Tensor] = {}
 
-    # Base case: root self-covariances and zero cross-covariances.
+    # Base case: root self-covariances and (optionally non-zero) cross-covariances.
     for r in roots:
         cov = root_covs[r]
         K[(r, r)] = hermitianize(cov) if symmetrize_self_blocks else cov
     for r in roots:
         for r2 in roots:
             if r2 < r:
-                d_r = K[(r, r)].shape[-1]
-                d_r2 = K[(r2, r2)].shape[-1]
-                K[(r, r2)] = torch.zeros(
-                    d_r, d_r2, dtype=K[(r, r)].dtype, device=K[(r, r)].device
-                )
+                sigma = cross_root_covs.get((r, r2))
+                if sigma is None:
+                    d_r = K[(r, r)].shape[-1]
+                    d_r2 = K[(r2, r2)].shape[-1]
+                    K[(r, r2)] = torch.zeros(
+                        d_r, d_r2, dtype=K[(r, r)].dtype, device=K[(r, r)].device
+                    )
+                else:
+                    K[(r, r2)] = sigma
 
     # Non-root nodes, in topological order.
     for j in range(num_roots, num_nodes):
@@ -184,7 +380,7 @@ def compute_effective_channel(
 
     Collapses the multi-root DAG to an equivalent multi-source linear Gaussian
     channel
-        Y = sum_{r in roots} G_M^{(r)} X_r + R_M,   {X_r} mutually independent,
+        Y = sum_{r in roots} G_M^{(r)} X_r + R_M,
     exposing the per-root effective channel matrices G_j^{(r)} (gain from
     source root r to node j) and the effective-noise covariance blocks
     C_{jk} = E[R_j R_k^H].
@@ -192,15 +388,26 @@ def compute_effective_channel(
     The per-root effective channel matrices follow, for each root r, the base
     case
         G_r^{(r)}  = I_{d_r},
-        G_{r'}^{(r)} = 0           (other root r' != r; roots are independent),
+        G_{r'}^{(r)} = 0           (other root r' != r),
     and the forward recursion over non-root nodes
         G_j^{(r)} = sum_{i in Pa(j)} A_{ji} G_i^{(r)},
     with G_j^{(r)} of shape (d_j, d_r). The effective-noise blocks obey the
     multi-root K-recursion with all root covariances set to zero; they are
     obtained here by reusing `compute_k_blocks_multiroot` with zero
     `root_covs`, which is exact because that recursion is affine in its
-    root-covariance seeds. Together they satisfy the decomposition
+    root-covariance seeds. The (G, C) representation is **intrinsic to the
+    channel** and does not depend on the source distribution.
+
+    Decomposition. Under independent sources X_r with covariance Sigma_r,
         K_{jk} = sum_{r in roots} G_j^{(r)} Sigma_r G_k^{(r)H} + C_{jk}.
+    Under correlated sources (cross_root_covs supplied to
+    `compute_k_blocks_multiroot`) the decomposition generalises to
+        K_{jk} = sum_{r, r' in roots} G_j^{(r)} Sigma_{r, r'} G_k^{(r')H}
+                  + C_{jk},
+    with Sigma_{r, r} = root_covs[r] and Sigma_{r, r'} = cross_root_covs[(r, r')]
+    (or its Hermitian transpose). The same (G, C) returned by this function
+    is the correct decomposition in both cases; only the source-covariance
+    block matrix changes.
 
     This is the multi-root generalization of the single-root
     effective-channel representation (Remark "Effective-channel
