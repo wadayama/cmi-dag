@@ -31,6 +31,12 @@ required. Every component is end-to-end differentiable, device-agnostic
 (CPU / CUDA), and built on top of the parent library's numerical
 primitives — there is no duplicated K-recursion or Cholesky code.
 
+See [`MATH.md`](MATH.md) for a self-contained derivation of the
+multi-root K-recursion, the block-extraction / Schur-complement
+construction of conditional MI, the rate-region rate functions, the
+composite sigmoid outage surrogate, and the projected gradient
+optimization.
+
 ## Sister libraries
 
 `cmi-dag` is one of four standalone members of the Gaussian-DAG
@@ -99,6 +105,7 @@ cmi-dag/
 ├── docs/                 5-part Markdown tutorial walkthrough
 ├── pyproject.toml        project metadata and dependencies (uv / pip)
 ├── LICENSE               MIT
+├── MATH.md               self-contained mathematical foundations
 └── README.md             this file
 ```
 
