@@ -400,25 +400,18 @@ CUDA; to force CPU on a CUDA machine, edit that single line.
 
 ## Citation
 
-If you use this library in academic work, please cite the parent
-library's accompanying paper:
+If you use this library in academic work, please cite the repository:
 
 ```bibtex
-@article{wadayama2026gaussiandag,
-  title  = {Mutual Information Optimization via K-Recursion and
-            Automatic Differentiation for Linear Gaussian Wireless Networks},
-  author = {Wadayama, Tadashi and Na, Siqi},
-  year   = {2026},
-  eprint = {TBD},
-  archivePrefix = {arXiv},
-  primaryClass  = {cs.IT},
+@software{wadayama_cmi_dag,
+  author  = {Wadayama, Tadashi},
+  title   = {{cmi-dag}: multi-root conditional mutual information on
+             linear {G}aussian {DAG}s},
+  year    = {2026},
+  version = {0.3.0},
+  url     = {https://github.com/wadayama/cmi-dag},
 }
 ```
-
-(The arXiv identifier will be filled in once the preprint is posted.)
-A companion paper covering the multi-terminal / conditional-MI
-extensions implemented here is in preparation; this README will be
-updated with the citation once the preprint is posted.
 
 ### Acknowledgement
 
