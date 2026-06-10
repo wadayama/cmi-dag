@@ -50,6 +50,15 @@ projected-gradient design and vendoring identical numerical primitives:
 | [`bussgang-dag`](https://github.com/wadayama/bussgang-dag) | Nonlinear node elements via Bussgang surrogate MI. | Soft-clipping PAs, low-resolution ADCs, hard-decision relays. |
 | [`fading-dag`](https://github.com/wadayama/fading-dag) | Random channel matrices via mini-batched Monte Carlo; ergodic capacity and outage. | Rayleigh / Ricean / Kronecker-correlated fading. |
 
+**Symbolic counterpart.**
+[`symbolic-dag`](https://github.com/wadayama/symbolic-dag) is the symbolic
+sibling of `cmi-dag`: the same multi-root K-recursion and the same
+conditional MI, but the gains and covariances are kept as **opaque
+symbols**, so it *derives* closed-form CMI expressions, Wirtinger
+gradients, and stationarity (KKT) / d-separation conditions instead of
+evaluating them — every result cross-checked numerically against
+`cmi-dag`. Numerics **discover**, symbolics **explain**.
+
 > **Funding.** This work was supported by JST, CRONOS, Japan
 > Grant Number **JPMJCS25N5**.
 
