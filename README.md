@@ -245,6 +245,7 @@ All symbols below are re-exported from the top-level package:
 from cmi_dag import (
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,
+    conditional_differential_entropy_from_k,
     Summand, evaluate_rate_functions,
     pga_descent,
 )
@@ -255,6 +256,7 @@ from cmi_dag import (
 | `compute_k_blocks_multiroot(num_nodes, roots, parents, edge_mats, root_covs, noise_covs, *, cross_root_covs=None, symmetrize_self_blocks=True)` | `krecursion` | Forward pass of the K-recursion for a DAG with multiple roots `{0, …, K-1}`. Returns the canonical block dict `K[(j, k)]` (`j ≥ k`). Roots are independent by default; passing `cross_root_covs={(r, r'): Σ_{r,r'}}` (canonical `r > r'`) seeds correlated sources (validated as joint Hermitian PD via Cholesky). Reduces to the parent's `compute_k_blocks` when `len(roots) == 1`. |
 | `compute_effective_channel(num_nodes, roots, parents, edge_mats, noise_covs, *, source_dims=None, symmetrize_self_blocks=True)` | `krecursion` | Collapse the multi-root DAG to an equivalent multi-source channel `Y = Σ_r G_M^{(r)} X_r + R_M`. Returns `(G, C)`: per-root effective channel matrices `G[(r, j)]` (shape `d_j × d_r`, `G[(r,r)]=I`, `G[(r,r')]=0`) and effective-noise blocks `C[(j, k)]`. Satisfies `K_{jk} = Σ_r G_j^{(r)} Σ_r G_k^{(r)H} + C_{jk}`. Reduces to `gaussian_dag.compute_effective_channel` when `len(roots) == 1`. Differentiable. |
 | `conditional_mutual_information_from_k(K, A, B, C=(), *, jitter=0.0)` | `information` | `I(V_A; V_B \| V_C) = log det Σ_{A\|C} − log det Σ_{A\|BC}` for arbitrary disjoint subsets `A, B, C` of the node set. Schur complement via `torch.linalg.solve`; log-det via the parent's Cholesky-based `logdet_hpd`. Differentiable. |
+| `conditional_differential_entropy_from_k(K, A, C=(), *, jitter=0.0)` | `information` | `h(V_A \| V_C) = log det Σ_{A\|C} + d_A·log(πe)` (nats, circular-complex convention; `d_A = Σ_{a∈A} dim V_a`). The one-Schur, one-log-det half of the CMI pipeline (`I = h(V_A\|V_C) − h(V_A\|V_BC)`); `C=()` gives the marginal `h(V_A)`. The additive constant has zero gradient, so only the log-det carries autograd sensitivity. Differentiable. |
 | `Summand` | `rate_region` | Type alias `tuple[float, Sequence[int], Sequence[int], Sequence[int]]` representing one term `α · I(V_A; V_B \| V_C)` of a rate function. |
 | `evaluate_rate_functions(K, inequalities, *, jitter=0.0)` | `rate_region` | Evaluate a family of rate functions `f_T = Σ_n α_{T,n} · I(V_{A_n}; V_{B_n} \| V_{C_n})` from one K-recursion forward pass. Coefficient signs are unrestricted (negative `α` is fine; needed for HK and secrecy objectives). |
 | `pga_descent(closure, params, *, step_size, num_iters, projector=None)` | `optimize` | Constant-step projected gradient **descent** on a user-supplied cost closure. Identical signature and history convention to `pga_ascent`; internally negates the closure and forwards. Returns history in the **true sign** of the objective (monotonically non-increasing on a successful descent). |
@@ -422,7 +424,7 @@ If you use this library in academic work, please cite the repository:
   title   = {{cmi-dag}: multi-root conditional mutual information on
              linear {G}aussian {DAG}s},
   year    = {2026},
-  version = {0.3.0},
+  version = {0.4.0},
   url     = {https://github.com/wadayama/cmi-dag},
 }
 ```

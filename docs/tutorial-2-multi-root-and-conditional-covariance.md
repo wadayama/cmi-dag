@@ -241,6 +241,38 @@ No explicit matrix inversion is formed: the Schur complement uses
 Cholesky-based `logdet_hpd`. Everything is differentiable through the
 edge matrices and the covariances.
 
+### 4a. Conditional differential entropy — half the pipeline
+
+The CMI formula above is a *difference* of conditional entropies,
+`I(V_A; V_B | V_C) = h(V_A | V_C) − h(V_A | V_{BC})`. Each half is a
+useful quantity in its own right — the **conditional differential
+entropy** of a circular complex Gaussian:
+
+```
+h(V_A | V_C)  =  log det Σ_{A|C}  +  d_A · log(π e)     (nats),
+```
+
+where `d_A = Σ_{a∈A} dim V_a`. This is the *one-Schur, one-log-det*
+specialization of the CMI: just one conditional covariance, one
+log-determinant, and an additive constant. Setting `C=()` gives the
+marginal entropy `h(V_A)`. The constant `d_A·log(πe)` has zero gradient,
+so optimizing `h` is exactly optimizing the log-volume `log det Σ_{A|C}`
+of the posterior covariance ellipsoid:
+
+```python
+from cmi_dag import conditional_differential_entropy_from_k
+
+h_Y          = conditional_differential_entropy_from_k(K, A=[2])        # marginal h(Y)
+h_Y_given_X  = conditional_differential_entropy_from_k(K, A=[2], C=[0, 1])  # h(Y | X_1, X_2)
+# Recover the joint-decoding facet as a difference of entropies:
+I_12         = h_Y - h_Y_given_X                       # == I(X_1, X_2; Y)
+```
+
+This is the primitive to reach for when entropy does *not* collapse to a
+mutual information — Bayesian experimental design / sensor placement
+(minimize posterior `log det`), Gaussian Slepian–Wolf rate regions,
+innovation rates, or absolute leakage constraints `h(V_A | V_C) ≥ γ`.
+
 ---
 
 ## 5. Try it: a non-trivial chain-rule identity

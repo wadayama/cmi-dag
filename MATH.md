@@ -239,6 +239,41 @@ entropy $h = \log\det(\pi e \, \Sigma)$ in nats; substituting (3.3a) and
 (3.3b), the $\log\det(\pi e \, I)$ terms cancel and (3.4) follows.
 $\square$
 
+### 3.2a Conditional differential entropy as a one-Schur specialization
+
+The proof of (3.4) factors the CMI through the entropy chain rule
+$I(V_A; V_B \mid V_C) = h(V_A \mid V_C) - h(V_A \mid V_{BC})$, so each of
+the two summands is itself a directly useful quantity. For a circular
+complex Gaussian with conditional covariance $\Sigma_{A \mid C} \succ 0$,
+the **conditional differential entropy** is
+
+$$h(V_A \mid V_C) = \log\det\!\big(\pi e \, \Sigma_{A \mid C}\big)
+  = \log\det \Sigma_{A \mid C} + d_A \log(\pi e), \tag{3.5}$$
+
+where $d_A = \sum_{a \in A} d_a$ is the total (complex) dimension of the
+information set, and with $C = \varnothing$ this reduces to the marginal
+$h(V_A) = \log\det \Sigma_{A, A} + d_A \log(\pi e)$. Whereas the CMI (3.4)
+needs two Schur complements and two log-determinants, the entropy (3.5) is
+**one Schur complement, one log-determinant, plus an additive constant**:
+exactly half of the CMI pipeline. The constant $d_A \log(\pi e)$ does not
+depend on the design parameter $\eta$, so $\nabla_{\eta^*} h(V_A \mid V_C)
+= \nabla_{\eta^*} \log\det \Sigma_{A \mid C}$ — the gradient is carried
+entirely by the log-determinant term and is identical to the gradient of
+the bare log-volume of the posterior covariance ellipsoid.
+
+Unlike CMI, the entropy primitive does not collapse to a mutual
+information in problems where the source/prior covariance is itself a
+design variable, or where an absolute (rather than relative) information
+level is constrained. Representative uses: Bayesian experimental design
+and sensor placement (minimizing posterior $\log\det \Sigma_{A \mid C}$),
+the Gaussian Slepian–Wolf / CEO rate region (defined directly through
+conditional differential entropies), the innovation rate of a Gaussian
+process, and privacy/leakage constraints of the form $h(V_A \mid V_C) \ge
+\gamma$. The relevant code path is
+`conditional_differential_entropy_from_k` in `cmi_dag.information`, which
+reuses the same conditional-covariance and Cholesky log-det primitives as
+the CMI.
+
 ### 3.3 Numerical implementation
 
 The inverses $\Sigma_{C, C}^{-1}$ and $\Sigma_{BC, BC}^{-1}$ in (3.3) are

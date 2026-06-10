@@ -26,6 +26,7 @@ self-contained (no `gaussian-dag` runtime dependency).
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 
 import torch
@@ -193,3 +194,70 @@ def conditional_mutual_information_from_k(
     return logdet_hpd(Sigma_A_given_C, jitter=jitter) - logdet_hpd(
         Sigma_A_given_BC, jitter=jitter
     )
+
+
+def conditional_differential_entropy_from_k(
+    K: dict[tuple[int, int], torch.Tensor],
+    A: Sequence[int],
+    C: Sequence[int] = (),
+    *,
+    jitter: float = 0.0,
+) -> torch.Tensor:
+    """Conditional differential entropy h(V_A | V_C) from K-blocks (in nats).
+
+    Implements the log-det closed form for a circular complex Gaussian,
+
+        h(V_A | V_C) = log det(pi e * Sigma_{A|C})
+                     = log det Sigma_{A|C} + d_A * log(pi e),
+
+    where Sigma_{A|C} is the conditional covariance (Schur complement of the
+    support block covariance) and d_A = sum_{a in A} dim(V_a) is the total
+    (complex) dimension of the information set A. With an empty conditioning
+    set C this reduces to the marginal differential entropy h(V_A).
+
+    This is the "one-Schur, one-log-det" specialization of conditional MI:
+    the conditional MI factors as a difference of conditional entropies,
+
+        I(V_A; V_B | V_C) = h(V_A | V_C) - h(V_A | V_{BC}),
+
+    so each `conditional_mutual_information_from_k` call is exactly two of
+    these entropy evaluations. The same conditional-covariance and
+    Cholesky-based log-det primitives are reused; only one Schur complement
+    plus an additive constant is needed.
+
+    Convention. Like the conditional MI, this uses the circular complex
+    Gaussian convention (no factor of 1/2; values in nats). The additive
+    constant d_A * log(pi e) is a pure constant in the design parameters,
+    so it does not affect any gradient: only the log-det term carries
+    autograd sensitivity. For real-dtype inputs the function still applies
+    the complex convention, consistent with the rest of the library.
+
+    Args:
+        K: Canonical K-blocks produced by either `compute_k_blocks` (parent,
+            single-root) or `compute_k_blocks_multiroot` (this library,
+            multi-root). Keys are (j, k) with j >= k.
+        A: Node indices of the information set (non-empty).
+        C: Conditioning node indices (default empty -> marginal entropy).
+        jitter: Optional diagonal jitter passed to `logdet_hpd` for
+            Sigma_{A|C}; useful when the conditional covariance is nearly
+            singular (rank-deficient controllable factors, low-SNR
+            channels, etc.).
+
+    Returns:
+        Real scalar tensor in nats, on the same `dtype` (real) / `device`
+        as the K-blocks. Differentiable through K (via the log-det term).
+
+    Raises:
+        ValueError: if A is empty, or if A and C are not disjoint.
+    """
+    A = sorted(A)
+    C = sorted(C)
+    if len(A) == 0:
+        raise ValueError("A must be non-empty.")
+    if set(A) & set(C):
+        raise ValueError(f"A and C must be disjoint; got A={A}, C={C}.")
+
+    Sigma_A_given_C = _conditional_cov(K, A, C)
+    logdet = logdet_hpd(Sigma_A_given_C, jitter=jitter)
+    d_A = sum(K[(a, a)].shape[-1] for a in A)
+    return logdet + d_A * math.log(math.pi * math.e)

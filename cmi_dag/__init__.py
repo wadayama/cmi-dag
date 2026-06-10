@@ -16,6 +16,7 @@ own paper.
 """
 
 from cmi_dag.information import (
+    conditional_differential_entropy_from_k,
     conditional_mutual_information_from_k,
     logdet_hpd,
 )
@@ -33,6 +34,7 @@ __all__ = [
     "Summand",
     "compute_effective_channel",
     "compute_k_blocks_multiroot",
+    "conditional_differential_entropy_from_k",
     "conditional_mutual_information_from_k",
     "evaluate_rate_functions",
     "get_K",
