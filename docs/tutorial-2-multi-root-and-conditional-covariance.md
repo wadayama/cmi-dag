@@ -236,10 +236,11 @@ triangle), and the two Schur complements `Σ_{X_1 | X_2}` and
 `Σ_{X_1 | X_2, Y}` are extracted from sub-blocks of `Σ_{S,S}` and fed
 into `log det` — once each.
 
-No explicit matrix inversion is formed: the Schur complement uses
-`torch.linalg.solve` and the log-determinants use the parent library's
-Cholesky-based `logdet_hpd`. Everything is differentiable through the
-edge matrices and the covariances.
+No explicit matrix inversion is formed: the Schur complement uses a
+Cholesky factorization of the conditioning block plus
+`torch.cholesky_solve`, and the log-determinants use the parent
+library's Cholesky-based `logdet_hpd`. Everything is differentiable
+through the edge matrices and the covariances.
 
 ### 4a. Conditional differential entropy — half the pipeline
 

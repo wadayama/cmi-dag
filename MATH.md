@@ -281,7 +281,10 @@ never formed explicitly. Each sub-block Schur complement is evaluated
 through a Cholesky-based linear solve, and each log-determinant in
 (3.4) as the sum of the diagonal logs of the corresponding Cholesky
 factor. Near singularity a small diagonal jitter $\varepsilon I$ is
-added before factorization; accumulated floating-point error can drift
+added before each factorization — both to the conditioning blocks
+$\Sigma_{C, C}$, $\Sigma_{BC, BC}$ ahead of the Schur solves and to the
+conditional covariances ahead of the log-determinants; accumulated
+floating-point error can drift
 $\Sigma_{A \mid C}$ and $\Sigma_{A \mid BC}$ off the Hermitian PD cone,
 so each is symmetrized as $\tfrac{1}{2}(\Sigma + \Sigma^{\mathsf{H}})$
 before its log-determinant is taken. The relevant code path is

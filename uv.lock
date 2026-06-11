@@ -4,10 +4,9 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "cmi-dag"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
-    { name = "numpy" },
     { name = "torch" },
 ]
 
@@ -17,12 +16,13 @@ dev = [
 ]
 examples = [
     { name = "matplotlib" },
+    { name = "numpy" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "matplotlib", marker = "extra == 'examples'", specifier = ">=3.10" },
-    { name = "numpy", specifier = ">=2.0" },
+    { name = "numpy", marker = "extra == 'examples'", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "torch", specifier = ">=2.12.0" },
 ]

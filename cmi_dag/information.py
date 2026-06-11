@@ -16,8 +16,9 @@ complement
 
 All sub-block covariances are read from the canonical K-blocks
 {K_{jk}} of the (multi-root) K-recursion by block extraction; no explicit
-matrix inverse is formed (linear solve only); the log-dets use the
-Cholesky-based `logdet_hpd`. Every operation is device-agnostic.
+matrix inverse is formed (Cholesky factorization + `torch.cholesky_solve`
+only); the log-dets use the Cholesky-based `logdet_hpd`. Every operation
+is device-agnostic.
 
 `logdet_hpd` is the same numerical primitive as in
 `gaussian_dag.information`; it is vendored here so this library is fully
@@ -121,22 +122,51 @@ def _conditional_cov(
     K: dict[tuple[int, int], torch.Tensor],
     A: Sequence[int],
     Z: Sequence[int],
+    *,
+    jitter: float = 0.0,
 ) -> torch.Tensor:
     """Conditional covariance Sigma_{A|Z} via the Schur complement.
 
     Returns Sigma_{A,A} - Sigma_{A,Z} Sigma_{Z,Z}^{-1} Sigma_{Z,A} for
     non-empty Z, and the marginal Sigma_{A,A} when Z is empty.
 
-    The inverse Sigma_{Z,Z}^{-1} is never formed: the correction term is
-    computed via a single `torch.linalg.solve`.
+    The inverse Sigma_{Z,Z}^{-1} is never formed: Sigma_{Z,Z} is Hermitian
+    positive definite under the model regularity assumption, so it is
+    Cholesky-factorized and the correction term is computed via
+    `torch.cholesky_solve`. The column block Sigma_{Z,A} is obtained as
+    Sigma_{A,Z}^H rather than re-assembled. If jitter > 0, Sigma_{Z,Z} is
+    regularized to Sigma_{Z,Z} + jitter * I before factorization (the same
+    remedy `logdet_hpd` applies to the conditional covariance itself).
+
+    Raises:
+        ValueError: if Sigma_{Z,Z} (after optional jitter) is not strictly
+            Hermitian positive definite, with the same remediation hints
+            as `logdet_hpd`.
     """
     Sigma_AA = _assemble(K, A, A)
     if len(Z) == 0:
         return Sigma_AA
     Sigma_AZ = _assemble(K, A, Z)
-    Sigma_ZZ = _assemble(K, Z, Z)
-    Sigma_ZA = _assemble(K, Z, A)
-    return Sigma_AA - Sigma_AZ @ torch.linalg.solve(Sigma_ZZ, Sigma_ZA)
+    Sigma_ZZ = hermitianize(_assemble(K, Z, Z))
+    if jitter > 0.0:
+        d = Sigma_ZZ.shape[-1]
+        Sigma_ZZ = Sigma_ZZ + jitter * torch.eye(
+            d, dtype=Sigma_ZZ.dtype, device=Sigma_ZZ.device
+        )
+    L, info = torch.linalg.cholesky_ex(Sigma_ZZ, check_errors=False)
+    info_value = int(info.item())
+    if info_value != 0:
+        raise ValueError(
+            f"Conditioning covariance Sigma_{{Z,Z}} for Z={list(Z)} is not "
+            "Hermitian positive definite (Cholesky failed at leading minor "
+            f"of order {info_value}). Common remedies: (1) ensure the noise "
+            "covariances of the conditioning nodes are strictly positive "
+            "definite (the regularity assumption); (2) pass jitter>0 to "
+            "absorb near-singularity; (3) inside pga_ascent / pga_descent, "
+            "reduce step_size so that iterates remain in the "
+            "positive-definite cone."
+        )
+    return Sigma_AA - Sigma_AZ @ torch.cholesky_solve(Sigma_AZ.mH, L)
 
 
 def conditional_mutual_information_from_k(
@@ -158,6 +188,12 @@ def conditional_mutual_information_from_k(
     which agrees with the parent's `mutual_information_from_k` when A and
     B are singletons.
 
+    Convention. Like the rest of the library, the log-det formula uses the
+    circular complex Gaussian convention (no factor of 1/2; values in
+    nats). For real-dtype inputs the same formula is applied unchanged,
+    which is twice the mutual information of a real Gaussian vector; halve
+    the result if the real-Gaussian convention is required.
+
     Args:
         K: Canonical K-blocks produced by either `compute_k_blocks` (parent,
             single-root) or `compute_k_blocks_multiroot` (this library,
@@ -165,9 +201,11 @@ def conditional_mutual_information_from_k(
         A: Node indices of the first information set (non-empty).
         B: Node indices of the second information set (non-empty).
         C: Conditioning node indices (default empty -> unconditional MI).
-        jitter: Optional diagonal jitter passed to `logdet_hpd` for both
-            Sigma_{A|C} and Sigma_{A|BC}; useful when these conditional
-            covariances are nearly singular (rank-deficient controllable
+        jitter: Optional diagonal jitter applied (i) to the conditioning
+            covariances Sigma_{C,C} and Sigma_{BC,BC} before their
+            Cholesky-based Schur solves, and (ii) to Sigma_{A|C} and
+            Sigma_{A|BC} inside `logdet_hpd`; useful when any of these
+            covariances is nearly singular (rank-deficient controllable
             factors, low-SNR channels, etc.).
 
     Returns:
@@ -175,8 +213,11 @@ def conditional_mutual_information_from_k(
         K-blocks. Differentiable through K.
 
     Raises:
-        ValueError: if A or B is empty, or if A, B, C are not pairwise
-            disjoint.
+        ValueError: if A or B is empty, if A, B, C are not pairwise
+            disjoint, or if a conditioning covariance Sigma_{C,C} /
+            Sigma_{BC,BC} or a conditional covariance Sigma_{A|C} /
+            Sigma_{A|BC} (after optional jitter) is not strictly Hermitian
+            positive definite.
     """
     A = sorted(A)
     B = sorted(B)
@@ -189,8 +230,8 @@ def conditional_mutual_information_from_k(
             f"A, B, C must be pairwise disjoint; got A={A}, B={B}, C={C}."
         )
 
-    Sigma_A_given_C = _conditional_cov(K, A, C)
-    Sigma_A_given_BC = _conditional_cov(K, A, sorted(B + C))
+    Sigma_A_given_C = _conditional_cov(K, A, C, jitter=jitter)
+    Sigma_A_given_BC = _conditional_cov(K, A, sorted(B + C), jitter=jitter)
     return logdet_hpd(Sigma_A_given_C, jitter=jitter) - logdet_hpd(
         Sigma_A_given_BC, jitter=jitter
     )
@@ -238,17 +279,20 @@ def conditional_differential_entropy_from_k(
             multi-root). Keys are (j, k) with j >= k.
         A: Node indices of the information set (non-empty).
         C: Conditioning node indices (default empty -> marginal entropy).
-        jitter: Optional diagonal jitter passed to `logdet_hpd` for
-            Sigma_{A|C}; useful when the conditional covariance is nearly
-            singular (rank-deficient controllable factors, low-SNR
-            channels, etc.).
+        jitter: Optional diagonal jitter applied (i) to the conditioning
+            covariance Sigma_{C,C} before its Cholesky-based Schur solve
+            and (ii) to Sigma_{A|C} inside `logdet_hpd`; useful when
+            either covariance is nearly singular (rank-deficient
+            controllable factors, low-SNR channels, etc.).
 
     Returns:
         Real scalar tensor in nats, on the same `dtype` (real) / `device`
         as the K-blocks. Differentiable through K (via the log-det term).
 
     Raises:
-        ValueError: if A is empty, or if A and C are not disjoint.
+        ValueError: if A is empty, if A and C are not disjoint, or if
+            Sigma_{C,C} or Sigma_{A|C} (after optional jitter) is not
+            strictly Hermitian positive definite.
     """
     A = sorted(A)
     C = sorted(C)
@@ -257,7 +301,7 @@ def conditional_differential_entropy_from_k(
     if set(A) & set(C):
         raise ValueError(f"A and C must be disjoint; got A={A}, C={C}.")
 
-    Sigma_A_given_C = _conditional_cov(K, A, C)
+    Sigma_A_given_C = _conditional_cov(K, A, C, jitter=jitter)
     logdet = logdet_hpd(Sigma_A_given_C, jitter=jitter)
     d_A = sum(K[(a, a)].shape[-1] for a in A)
     return logdet + d_A * math.log(math.pi * math.e)

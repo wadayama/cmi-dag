@@ -285,8 +285,9 @@ def compute_k_blocks_multiroot(
     Raises:
         ValueError: if `roots` is not the prefix {0, ..., K-1} in
             topological order, if K >= num_nodes (no non-root node), if a
-            non-root has empty / out-of-order parents, if a non-root is
-            missing from `noise_covs`, if `cross_root_covs` violates the
+            non-root has empty / duplicate / out-of-order parents, if an
+            edge declared in `parents` is missing from `edge_mats`, if a
+            non-root is missing from `noise_covs`, if `cross_root_covs` violates the
             key-shape / tensor-shape / dtype / device contract, or if the
             assembled joint root covariance is not Hermitian positive
             definite.
@@ -336,11 +337,22 @@ def compute_k_blocks_multiroot(
     for j in range(num_roots, num_nodes):
         if j not in parents or len(parents[j]) == 0:
             raise ValueError(f"Non-root node {j} has no parents.")
+        if len(set(parents[j])) != len(parents[j]):
+            raise ValueError(
+                f"parents[{j}] contains duplicate entries: {parents[j]}. "
+                "Each parent must appear exactly once (a duplicate would "
+                "silently double-count its edge contribution)."
+            )
         for i in parents[j]:
             if not (0 <= i < j):
                 raise ValueError(
                     f"Parent {i} of node {j} violates topological order "
                     f"(0 <= i < j)."
+                )
+            if (j, i) not in edge_mats:
+                raise ValueError(
+                    f"edge_mats is missing the entry for edge ({j}, {i}) "
+                    f"declared in parents[{j}]."
                 )
         if j not in noise_covs:
             raise ValueError(f"noise_covs is missing the entry for non-root node {j}.")

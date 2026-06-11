@@ -28,8 +28,9 @@ in a single sweep; PyTorch's complex autograd then delivers the exact
 Wirtinger gradient with respect to every controllable factor in the DAG
 in a single backward sweep. No per-topology gradient derivation is
 required. Every component is end-to-end differentiable, device-agnostic
-(CPU / CUDA), and built on top of the parent library's numerical
-primitives — there is no duplicated K-recursion or Cholesky code.
+(CPU / CUDA), and built on the same numerical primitives as the parent
+library (vendored here byte-identical, so no `gaussian-dag` install is
+needed).
 
 See [`MATH.md`](MATH.md) for a self-contained derivation of the
 multi-root K-recursion, the block-extraction / Schur-complement
@@ -96,7 +97,7 @@ You should see all tests pass; one device-parameterised CUDA test is
 skipped on CPU-only machines, which is expected.
 
 To run the figure-reproduction examples, install the optional
-`matplotlib` dependency:
+examples dependencies (`matplotlib`, `numpy`):
 
 ```bash
 uv sync --extra examples
@@ -109,7 +110,7 @@ uv sync --extra examples
 ```
 cmi-dag/
 ├── cmi_dag/     core library (4 modules + __init__)
-├── tests/                pytest suite (37 tests, 6 files)
+├── tests/                pytest suite (87 tests, 11 files)
 ├── examples/             3 runnable scripts (paper-figure reproduction)
 ├── docs/                 5-part Markdown tutorial walkthrough
 ├── pyproject.toml        project metadata and dependencies (uv / pip)
@@ -263,8 +264,8 @@ from cmi_dag import (
 | Symbol | Module | Purpose |
 | --- | --- | --- |
 | `compute_k_blocks_multiroot(num_nodes, roots, parents, edge_mats, root_covs, noise_covs, *, cross_root_covs=None, symmetrize_self_blocks=True)` | `krecursion` | Forward pass of the K-recursion for a DAG with multiple roots `{0, …, K-1}`. Returns the canonical block dict `K[(j, k)]` (`j ≥ k`). Roots are independent by default; passing `cross_root_covs={(r, r'): Σ_{r,r'}}` (canonical `r > r'`) seeds correlated sources (validated as joint Hermitian PD via Cholesky). Reduces to the parent's `compute_k_blocks` when `len(roots) == 1`. |
-| `compute_effective_channel(num_nodes, roots, parents, edge_mats, noise_covs, *, source_dims=None, symmetrize_self_blocks=True)` | `krecursion` | Collapse the multi-root DAG to an equivalent multi-source channel `Y = Σ_r G_M^{(r)} X_r + R_M`. Returns `(G, C)`: per-root effective channel matrices `G[(r, j)]` (shape `d_j × d_r`, `G[(r,r)]=I`, `G[(r,r')]=0`) and effective-noise blocks `C[(j, k)]`. Satisfies `K_{jk} = Σ_r G_j^{(r)} Σ_r G_k^{(r)H} + C_{jk}`. Reduces to `gaussian_dag.compute_effective_channel` when `len(roots) == 1`. Differentiable. |
-| `conditional_mutual_information_from_k(K, A, B, C=(), *, jitter=0.0)` | `information` | `I(V_A; V_B \| V_C) = log det Σ_{A\|C} − log det Σ_{A\|BC}` for arbitrary disjoint subsets `A, B, C` of the node set. Schur complement via `torch.linalg.solve`; log-det via the parent's Cholesky-based `logdet_hpd`. Differentiable. |
+| `compute_effective_channel(num_nodes, roots, parents, edge_mats, noise_covs, *, source_dims=None, symmetrize_self_blocks=True)` | `krecursion` | Collapse the multi-root DAG to an equivalent multi-source channel `Y = Σ_r G_M^{(r)} X_r + R_M`. Returns `(G, C)`: per-root effective channel matrices `G[(r, j)]` (shape `d_j × d_r`, `G[(r,r)]=I`, `G[(r,r')]=0`) and effective-noise blocks `C[(j, k)]`. Satisfies `K_{jk} = Σ_{r∈roots} G_j^{(r)} Σ_r G_k^{(r)H} + C_{jk}` (outer `Σ` = sum over roots, inner `Σ_r` = root covariance). Reduces to `gaussian_dag.compute_effective_channel` when `len(roots) == 1`. Differentiable. |
+| `conditional_mutual_information_from_k(K, A, B, C=(), *, jitter=0.0)` | `information` | `I(V_A; V_B \| V_C) = log det Σ_{A\|C} − log det Σ_{A\|BC}` for arbitrary disjoint subsets `A, B, C` of the node set. Schur complement via Cholesky factorization + `torch.cholesky_solve`; log-det via the parent's Cholesky-based `logdet_hpd`. Differentiable. |
 | `conditional_differential_entropy_from_k(K, A, C=(), *, jitter=0.0)` | `information` | `h(V_A \| V_C) = log det Σ_{A\|C} + d_A·log(πe)` (nats, circular-complex convention; `d_A = Σ_{a∈A} dim V_a`). The one-Schur, one-log-det half of the CMI pipeline (`I = h(V_A\|V_C) − h(V_A\|V_BC)`); `C=()` gives the marginal `h(V_A)`. The additive constant has zero gradient, so only the log-det carries autograd sensitivity. Differentiable. |
 | `Summand` | `rate_region` | Type alias `tuple[float, Sequence[int], Sequence[int], Sequence[int]]` representing one term `α · I(V_A; V_B \| V_C)` of a rate function. |
 | `evaluate_rate_functions(K, inequalities, *, jitter=0.0)` | `rate_region` | Evaluate a family of rate functions `f_T = Σ_n α_{T,n} · I(V_{A_n}; V_{B_n} \| V_{C_n})` from one K-recursion forward pass. Coefficient signs are unrestricted (negative `α` is fine; needed for HK and secrecy objectives). |
@@ -320,12 +321,21 @@ or its submodules (`cmi_dag.optimize`, `cmi_dag.projections`). No
   is absorbed into the step size of both `pga_ascent` and
   `pga_descent`.
 - **Units.** All MI values are in **nats**.
+- **Real dtype.** The log-det formulas use the circular complex
+  Gaussian convention (no factor of 1/2). They apply unchanged to
+  real-dtype inputs, where the returned CMI is **twice** the mutual
+  information of a real Gaussian vector; halve the result if the
+  real-Gaussian convention is required. The same caveat applies to
+  `conditional_differential_entropy_from_k` (see its docstring).
 - **Domain failures.** Like the parent, the library requires the
-  conditional covariances `Σ_{A|C}` and `Σ_{A|BC}` to be strictly
-  Hermitian positive-definite. Cholesky failures surface as a
-  diagnostic `ValueError` (not an autograd-internal NaN). Mitigate
-  with `jitter > 0` in the CMI / rate-function calls, or by ensuring
-  the noise covariances at all non-root nodes are strictly PD.
+  conditioning covariances `Σ_{C,C}`, `Σ_{BC,BC}` and the conditional
+  covariances `Σ_{A|C}`, `Σ_{A|BC}` to be strictly Hermitian
+  positive-definite. Cholesky failures surface as a diagnostic
+  `ValueError` (not an autograd-internal NaN). Mitigate with
+  `jitter > 0` in the CMI / rate-function calls (the jitter
+  regularizes both the conditioning blocks before the Schur solve and
+  the conditional covariances before the log-det), or by ensuring the
+  noise covariances at all non-root nodes are strictly PD.
 
 ---
 
@@ -433,7 +443,7 @@ If you use this library in academic work, please cite the repository:
   title   = {{cmi-dag}: multi-root conditional mutual information on
              linear {G}aussian {DAG}s},
   year    = {2026},
-  version = {0.4.0},
+  version = {0.5.0},
   url     = {https://github.com/wadayama/cmi-dag},
 }
 ```
