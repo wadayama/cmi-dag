@@ -16,6 +16,11 @@ Each tutorial is self-contained and includes runnable code snippets. The
 scripts under `../examples/` accompany Tutorials 3–5 as the polished
 end-to-end versions; reading them is optional.
 
+See also [`builder-notes.md`](builder-notes.md) for the named-node
+`GaussianDAG` builder — a pure additive convenience over the functional API
+(implementation notes and supported profiles: conditional / multiroot /
+correlated-roots).
+
 These tutorials are self-contained — `cmi-dag` has no `gaussian-dag`
 runtime dependency. That said, the single-root background (the
 `compute_k_blocks` recursion and `pga_ascent`) is introduced more gently

@@ -189,6 +189,42 @@ For the scalar case (`d = 1`) the three values agree with the classical
 `log(1 + SNR)` capacity formulas to machine precision (verified in
 `tests/test_closed_form.py`).
 
+### Alternatively: build the DAG with named nodes
+
+The same multi-root DAG can be declared with the named-node `GaussianDAG`
+builder, a thin convenience layer that *lowers* to the functional core above
+(no numerics change). You name the roots and nodes, give each its parents and
+the matrix on each incoming edge, and ask for a quantity:
+
+```python
+import torch
+from cmi_dag import GaussianDAG
+
+torch.manual_seed(0)
+d, sigma = 2, 0.5
+H_1 = torch.randn(d, d, dtype=torch.complex128)
+H_2 = torch.randn(d, d, dtype=torch.complex128)
+Sigma_root = torch.eye(d, dtype=torch.complex128)
+Sigma_Z    = (sigma ** 2) * torch.eye(d, dtype=torch.complex128)
+
+dag = GaussianDAG()
+dag.add_source("X1", cov=Sigma_root)        # multiple roots are allowed
+dag.add_source("X2", cov=Sigma_root)
+dag.add_node("Y", parents={"X1": H_1, "X2": H_2}, noise=Sigma_Z)
+
+I_1  = dag.cmi(A=["X1"], B=["Y"], C=["X2"])  # same values as above
+I_2  = dag.cmi(A=["X2"], B=["Y"], C=["X1"])
+I_12 = dag.cmi(A=["X1", "X2"], B=["Y"])      # C omitted -> unconditional
+```
+
+The builder is a pure, backward-compatible addition; the index-based functional
+API stays exactly as it is. Correlated sources are declared with
+`dag.add_root_correlation("X1", "X2", cov=Sigma_12)`. Matrices may be given as
+concrete tensors (above) or by name and resolved at query time via
+`cmi(..., bind={...})`. This library implements the *conditional*, *multiroot*,
+and *correlated-roots* profiles; see `cmi_dag/builder.py` and
+`docs/builder-notes.md` for the full surface.
+
 ### Optimize the MAC rate-region sum
 
 Make the precoders `F_1, F_2` trainable, run projected gradient ascent
@@ -253,6 +289,7 @@ All symbols below are re-exported from the top-level package:
 
 ```python
 from cmi_dag import (
+    GaussianDAG,
     compute_k_blocks_multiroot,
     conditional_mutual_information_from_k,
     conditional_differential_entropy_from_k,
@@ -263,6 +300,7 @@ from cmi_dag import (
 
 | Symbol | Module | Purpose |
 | --- | --- | --- |
+| `GaussianDAG()` | `builder` | Named-node declarative builder: `add_source(name, cov=…)`, `add_node(name, parents={…}, noise=…)`, optional `add_root_correlation(a, b, cov=…)`, then `cmi(A, B, C=())` / `cov(node)`. Lowers to `compute_k_blocks_multiroot` + `conditional_mutual_information_from_k`; a pure additive convenience over the functional API (conditional / multiroot / correlated-roots profiles). |
 | `compute_k_blocks_multiroot(num_nodes, roots, parents, edge_mats, root_covs, noise_covs, *, cross_root_covs=None, symmetrize_self_blocks=True)` | `krecursion` | Forward pass of the K-recursion for a DAG with multiple roots `{0, …, K-1}`. Returns the canonical block dict `K[(j, k)]` (`j ≥ k`). Roots are independent by default; passing `cross_root_covs={(r, r'): Σ_{r,r'}}` (canonical `r > r'`) seeds correlated sources (validated as joint Hermitian PD via Cholesky). Reduces to the parent's `compute_k_blocks` when `len(roots) == 1`. |
 | `compute_effective_channel(num_nodes, roots, parents, edge_mats, noise_covs, *, source_dims=None, symmetrize_self_blocks=True)` | `krecursion` | Collapse the multi-root DAG to an equivalent multi-source channel `Y = Σ_r G_M^{(r)} X_r + R_M`. Returns `(G, C)`: per-root effective channel matrices `G[(r, j)]` (shape `d_j × d_r`, `G[(r,r)]=I`, `G[(r,r')]=0`) and effective-noise blocks `C[(j, k)]`. Satisfies `K_{jk} = Σ_{r∈roots} G_j^{(r)} Σ_r G_k^{(r)H} + C_{jk}` (outer `Σ` = sum over roots, inner `Σ_r` = root covariance). Reduces to `gaussian_dag.compute_effective_channel` when `len(roots) == 1`. Differentiable. |
 | `conditional_mutual_information_from_k(K, A, B, C=(), *, jitter=0.0)` | `information` | `I(V_A; V_B \| V_C) = log det Σ_{A\|C} − log det Σ_{A\|BC}` for arbitrary disjoint subsets `A, B, C` of the node set. Schur complement via Cholesky factorization + `torch.cholesky_solve`; log-det via the parent's Cholesky-based `logdet_hpd`. Differentiable. |

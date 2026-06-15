@@ -15,6 +15,7 @@ runtime dependency. These primitives are byte-identical to those in
 own paper.
 """
 
+from cmi_dag.builder import GaussianDAG
 from cmi_dag.information import (
     conditional_differential_entropy_from_k,
     conditional_mutual_information_from_k,
@@ -31,6 +32,7 @@ from cmi_dag.projections import project_frobenius_ball, project_total_power
 from cmi_dag.rate_region import Summand, evaluate_rate_functions
 
 __all__ = [
+    "GaussianDAG",
     "Summand",
     "compute_effective_channel",
     "compute_k_blocks_multiroot",
