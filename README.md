@@ -40,9 +40,10 @@ optimization.
 
 ## Sister libraries
 
-`cmi-dag` is one of four standalone members of the Gaussian-DAG
-family, all sharing the same K-recursion / complex-autograd /
-projected-gradient design and vendoring identical numerical primitives:
+`cmi-dag` is part of the Gaussian-DAG family — standalone numerical
+libraries sharing the same K-recursion / complex-autograd /
+projected-gradient design (and vendoring identical numerical primitives),
+plus the shared projected-gradient core they all build on:
 
 | Library | Scope | When to use |
 | --- | --- | --- |
@@ -50,6 +51,7 @@ projected-gradient design and vendoring identical numerical primitives:
 | [`cmi-dag`](https://github.com/wadayama/cmi-dag) | Multi-root + conditional MI on arbitrary disjoint subsets; rate-region facets. | MAC, BC, IC, wiretap, multi-terminal rate regions. |
 | [`bussgang-dag`](https://github.com/wadayama/bussgang-dag) | Nonlinear node elements via Bussgang surrogate MI. | Soft-clipping PAs, low-resolution ADCs, hard-decision relays. |
 | [`fading-dag`](https://github.com/wadayama/fading-dag) | Random channel matrices via mini-batched Monte Carlo; ergodic capacity and outage. | Rayleigh / Ricean / Kronecker-correlated fading. |
+| [`pga-toolbox`](https://github.com/wadayama/pga-toolbox) | Shared projected-gradient ascent/descent core (fixed-step / Armijo / SPG / batched multi-start) for complex Wirtinger & real parameters. | The optimiser every numerical library here vendors; depend on it directly for custom constrained objectives. |
 
 **Symbolic counterpart.**
 [`symbolic-dag`](https://github.com/wadayama/symbolic-dag) is the symbolic
