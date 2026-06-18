@@ -111,8 +111,19 @@ def _assemble_root_block(
                     )
                 else:
                     blocks.append(sigma.mH)
-        row_strips.append(torch.cat(blocks, dim=-1))
-    return torch.cat(row_strips, dim=-2)
+        row_strips.append(blocks)
+    # Broadcast every block to the common leading batch shape before stacking,
+    # so batched root covariances coexist with unbatched zero cross-blocks.
+    flat = [b for strip in row_strips for b in strip]
+    batch = torch.broadcast_shapes(*(b.shape[:-2] for b in flat))
+
+    def _b(block: torch.Tensor) -> torch.Tensor:
+        return block.expand(*batch, block.shape[-2], block.shape[-1])
+
+    return torch.cat(
+        [torch.cat([_b(b) for b in strip], dim=-1) for strip in row_strips],
+        dim=-2,
+    )
 
 
 def _validate_cross_root_covs(
@@ -189,10 +200,13 @@ def _validate_cross_root_covs(
     Sigma_RR = _assemble_root_block(roots, root_covs, cross_root_covs).detach()
     Sigma_RR = 0.5 * (Sigma_RR + Sigma_RR.mH)
     _, info = torch.linalg.cholesky_ex(Sigma_RR, check_errors=False)
-    info_value = int(info.item())
-    if info_value != 0:
+    if torch.any(info != 0):
+        flat = info.reshape(-1)
+        first = int(torch.nonzero(flat != 0, as_tuple=False)[0])
+        info_value = int(flat[first])
+        n_fail, total = int((flat != 0).sum()), int(flat.numel())
         # Heuristic: map the leading-minor index back to a root pair via
-        # cumulative dimensions.
+        # cumulative dimensions (for the first failing batch element).
         cum = 0
         which_root = roots[-1]
         for r in roots:
@@ -201,11 +215,14 @@ def _validate_cross_root_covs(
                 which_root = r
                 break
             cum += d_r
+        where = ("" if total == 1
+                 else f" ({n_fail} of {total} batch elements; first at index "
+                      f"{first})")
         raise ValueError(
             "Joint root covariance Sigma_{R, R} (assembled from root_covs "
             "and cross_root_covs) is not Hermitian positive definite: "
             f"Cholesky failed at leading minor of order {info_value} "
-            f"(within the block of root {which_root}). Common remedies: "
+            f"(within the block of root {which_root}){where}. Common remedies: "
             "(1) reduce the magnitude of cross_root_covs entries; "
             "(2) inflate root_covs diagonals; (3) verify that "
             "cross_root_covs keys follow the canonical (r > r') convention."

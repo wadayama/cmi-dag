@@ -194,3 +194,47 @@ def test_nonempty_required():
     K = _build_mac_K(d=2, seed=601)
     with pytest.raises(ValueError, match="non-empty"):
         conditional_mutual_information_from_k(K, A=[], B=[2], C=[])
+
+
+# ============================================================
+# Test 7: batch-safety -- a leading config batch dimension yields one CMI per
+# element, matching per-element evaluation (exercises batched logdet_hpd and the
+# conditional-covariance Schur solve over the batch).
+# ============================================================
+
+
+def test_logdet_hpd_batched():
+    from cmi_dag.information import logdet_hpd
+
+    d, B = 3, 5
+    mats = torch.stack([_hermitian_psd(d, seed=700 + b) for b in range(B)])
+    out = logdet_hpd(mats)
+    assert out.shape == (B,)
+    expected = torch.linalg.slogdet(mats).logabsdet
+    assert torch.allclose(out, expected, atol=1e-10)
+    for b in range(B):
+        assert torch.allclose(out[b], logdet_hpd(mats[b]), atol=1e-12)
+
+
+def test_cmi_batched_matches_per_element():
+    d, B = 2, 4
+    A0 = torch.stack([_randn_complex(d, d, seed=300 + b) for b in range(B)])
+    A1 = torch.stack([_randn_complex(d, d, seed=400 + b) for b in range(B)])
+    r0 = torch.eye(d, dtype=DTYPE)
+    r1 = torch.eye(d, dtype=DTYPE)
+    nz = torch.eye(d, dtype=DTYPE)
+
+    def build(a0, a1):
+        return compute_k_blocks_multiroot(
+            num_nodes=3, roots=[0, 1], parents={2: [0, 1]},
+            edge_mats={(2, 0): a0, (2, 1): a1},
+            root_covs={0: r0, 1: r1}, noise_covs={2: nz},
+        )
+
+    # Conditioning set C=[1] exercises the conditional-covariance Schur path.
+    cmi_b = conditional_mutual_information_from_k(build(A0, A1), A=[0], B=[2], C=[1])
+    assert cmi_b.shape == (B,)
+    for b in range(B):
+        cmi_s = conditional_mutual_information_from_k(
+            build(A0[b], A1[b]), A=[0], B=[2], C=[1])
+        assert torch.allclose(cmi_b[b], cmi_s, atol=1e-10)

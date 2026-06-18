@@ -50,8 +50,10 @@ def logdet_hpd(A: torch.Tensor, jitter: float = 0.0) -> torch.Tensor:
     opaque PyTorch error propagate out of the autograd graph.
 
     Args:
-        A: Hermitian positive-definite matrix (shape d x d, complex or
-            real). With the default ``jitter=0`` the input must be
+        A: Hermitian positive-definite matrix, shape ``(..., d, d)`` (complex
+            or real). A leading batch dimension is supported: each ``(d, d)``
+            slice is treated independently and the result has the batch shape
+            ``(...)``. With the default ``jitter=0`` the input must be
             strictly positive-definite; otherwise the Cholesky factorisation
             fails and a ``ValueError`` is raised (see Raises). A
             rank-deficient or merely PSD input can be admitted by passing
@@ -65,7 +67,9 @@ def logdet_hpd(A: torch.Tensor, jitter: float = 0.0) -> torch.Tensor:
             experiment that uses it.
 
     Returns:
-        Real scalar tensor: log det A (natural log; nats convention).
+        Real tensor of shape ``(...)``: log det A (natural log; nats
+        convention). A single ``(d, d)`` input yields a 0-dim scalar; a
+        batched ``(..., d, d)`` input yields one log-det per batch element.
 
     Raises:
         ValueError: if A (after optional jitter) is not strictly positive
@@ -83,11 +87,21 @@ def logdet_hpd(A: torch.Tensor, jitter: float = 0.0) -> torch.Tensor:
         d = A.shape[-1]
         A = A + jitter * torch.eye(d, dtype=A.dtype, device=A.device)
     L, info = torch.linalg.cholesky_ex(A, check_errors=False)
-    info_value = int(info.item())
-    if info_value != 0:
+    if torch.any(info != 0):
+        flat = info.reshape(-1)
+        first = int(torch.nonzero(flat != 0, as_tuple=False)[0])
+        order = int(flat[first])
+        n_fail, total = int((flat != 0).sum()), int(flat.numel())
+        scope = (
+            f"input matrix is not Hermitian positive definite "
+            f"(Cholesky failed at leading minor of order {order})"
+            if total == 1 else
+            f"{n_fail} of {total} batched input matrices are not Hermitian "
+            f"positive definite (first failure at batch index {first}, "
+            f"Cholesky failed at leading minor of order {order})"
+        )
         raise ValueError(
-            "logdet_hpd: input matrix is not Hermitian positive definite "
-            f"(Cholesky failed at leading minor of order {info_value}). "
+            "logdet_hpd: " + scope + ". "
             "Common remedies: (1) ensure the terminal noise covariance is "
             "strictly positive definite (the regularity assumption); "
             "(2) pass jitter>0 to logdet_hpd / "
@@ -95,7 +109,8 @@ def logdet_hpd(A: torch.Tensor, jitter: float = 0.0) -> torch.Tensor:
             "(3) inside pga_descent, reduce step_size so that iterates remain "
             "in the positive-definite cone."
         )
-    return 2.0 * torch.log(torch.diagonal(L).real).sum()
+    diag = torch.diagonal(L, dim1=-2, dim2=-1).real
+    return 2.0 * torch.log(diag).sum(-1)
 
 
 def _assemble(
@@ -108,13 +123,23 @@ def _assemble(
     Block (r, c) is K_{rc} = E[V_r V_c^H], read via the Hermitian-flip
     helper `get_K`.
 
-    Returns a tensor of shape (sum_{r in rows} d_r, sum_{c in cols} d_c)
-    on the same `dtype` / `device` as the underlying K-blocks.
+    Returns a tensor of shape ``(*batch, sum_{r in rows} d_r,
+    sum_{c in cols} d_c)`` on the same `dtype` / `device` as the underlying
+    K-blocks, where ``batch`` is the broadcast of the K-blocks' leading
+    dimensions. Blocks of differing batch rank (e.g. unbatched root covariances
+    alongside batched descendant blocks) are broadcast to the common batch shape
+    before concatenation, so a leading config/parameter batch dimension is
+    supported.
     """
-    row_strips = []
-    for r in rows:
-        blocks = [get_K(K, r, c) for c in cols]
-        row_strips.append(torch.cat(blocks, dim=-1))
+    grid = {(r, c): get_K(K, r, c) for r in rows for c in cols}
+    batch = torch.broadcast_shapes(*(b.shape[:-2] for b in grid.values()))
+
+    def _b(block: torch.Tensor) -> torch.Tensor:
+        return block.expand(*batch, block.shape[-2], block.shape[-1])
+
+    row_strips = [
+        torch.cat([_b(grid[(r, c)]) for c in cols], dim=-1) for r in rows
+    ]
     return torch.cat(row_strips, dim=-2)
 
 
@@ -154,12 +179,18 @@ def _conditional_cov(
             d, dtype=Sigma_ZZ.dtype, device=Sigma_ZZ.device
         )
     L, info = torch.linalg.cholesky_ex(Sigma_ZZ, check_errors=False)
-    info_value = int(info.item())
-    if info_value != 0:
+    if torch.any(info != 0):
+        flat = info.reshape(-1)
+        first = int(torch.nonzero(flat != 0, as_tuple=False)[0])
+        order = int(flat[first])
+        n_fail, total = int((flat != 0).sum()), int(flat.numel())
+        where = ("" if total == 1
+                 else f" ({n_fail} of {total} batch elements; first at index "
+                      f"{first})")
         raise ValueError(
             f"Conditioning covariance Sigma_{{Z,Z}} for Z={list(Z)} is not "
             "Hermitian positive definite (Cholesky failed at leading minor "
-            f"of order {info_value}). Common remedies: (1) ensure the noise "
+            f"of order {order}){where}. Common remedies: (1) ensure the noise "
             "covariances of the conditioning nodes are strictly positive "
             "definite (the regularity assumption); (2) pass jitter>0 to "
             "absorb near-singularity; (3) inside pga_ascent / pga_descent, "
@@ -209,8 +240,11 @@ def conditional_mutual_information_from_k(
             factors, low-SNR channels, etc.).
 
     Returns:
-        Real scalar tensor in nats, on the same `dtype` / `device` as the
-        K-blocks. Differentiable through K.
+        Real tensor in nats, on the same `dtype` / `device` as the K-blocks,
+        differentiable through K. A 0-dim scalar for unbatched K-blocks; if the
+        K-blocks carry a leading batch dimension ``(..., d, d)`` (e.g. many
+        parameter or configuration settings evaluated at once), the result has
+        shape ``(...)`` — one CMI value per batch element.
 
     Raises:
         ValueError: if A or B is empty, if A, B, C are not pairwise
