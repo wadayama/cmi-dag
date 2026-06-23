@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%E2%89%A53.12-blue.svg)](https://www.python.org/)
+[![arXiv](https://img.shields.io/badge/arXiv-2606.22301-b31b1b.svg)](https://arxiv.org/abs/2606.22301)
 
 Conditional mutual information and gradient-based optimization for
 multi-terminal linear Gaussian directed acyclic graphs (DAGs).
@@ -31,6 +32,11 @@ required. Every component is end-to-end differentiable, device-agnostic
 (CPU / CUDA), and built on the same numerical primitives as the parent
 library (vendored here byte-identical, so no `gaussian-dag` install is
 needed).
+
+**Companion paper.** The theory, algorithms, and experiments behind this
+library are described in T. Wadayama and S. Na, *"Differentiable Conditional
+Mutual Information for Multi-Terminal Linear Gaussian Wireless Networks,"*
+[arXiv:2606.22301](https://arxiv.org/abs/2606.22301).
 
 See [`MATH.md`](MATH.md) for a self-contained derivation of the
 multi-root K-recursion, the block-extraction / Schur-complement
@@ -475,7 +481,20 @@ CUDA; to force CPU on a CUDA machine, edit that single line.
 
 ## Citation
 
-If you use this library in academic work, please cite the repository:
+If you use this library in academic work, please cite the companion paper:
+
+```bibtex
+@article{wadayama_na_cmi_dag,
+  author  = {Wadayama, Tadashi and Na, Siqi},
+  title   = {Differentiable Conditional Mutual Information for
+             Multi-Terminal Linear {G}aussian Wireless Networks},
+  journal = {arXiv preprint arXiv:2606.22301},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2606.22301},
+}
+```
+
+and/or the repository:
 
 ```bibtex
 @software{wadayama_cmi_dag,
