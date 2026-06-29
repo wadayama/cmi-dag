@@ -55,7 +55,6 @@ plus the shared projected-gradient core they all build on:
 | --- | --- | --- |
 | [`gaussian-dag`](https://github.com/wadayama/gaussian-dag) | Single-pair MI on deterministic linear Gaussian DAGs (parent). | Single-link MIMO, multi-hop AF relay, diamond, input-covariance shaping. |
 | [`cmi-dag`](https://github.com/wadayama/cmi-dag) | Multi-root + conditional MI on arbitrary disjoint subsets; rate-region facets. | MAC, BC, IC, wiretap, multi-terminal rate regions. |
-| [`bussgang-dag`](https://github.com/wadayama/bussgang-dag) | Nonlinear node elements via Bussgang surrogate MI. | Soft-clipping PAs, low-resolution ADCs, hard-decision relays. |
 | [`fading-dag`](https://github.com/wadayama/fading-dag) | Random channel matrices via mini-batched Monte Carlo; ergodic capacity and outage. | Rayleigh / Ricean / Kronecker-correlated fading. |
 | [`pga-toolbox`](https://github.com/wadayama/pga-toolbox) | Shared projected-gradient ascent/descent core (fixed-step / Armijo / SPG / batched multi-start) for complex Wirtinger & real parameters. | The optimiser every numerical library here vendors; depend on it directly for custom constrained objectives. |
 
